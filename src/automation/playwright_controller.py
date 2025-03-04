@@ -45,25 +45,19 @@ def launch_browser_with_profile():
         browser_context = playwright.chromium.launch_persistent_context(
             user_data_dir=temp_profile_path,
             headless=False,
-            args=["--start-maximized"]  # Add this arg to start maximized
+            args=["--start-maximized", "--window-size=1920,1080"]  # Force maximized window
         )
         
-        # Explicitly set the viewport to a large size
-        pages = browser_context.pages
-        if len(pages) == 0:
-            page = browser_context.new_page()
-        else:
-            page = pages[0]
-            
-        # Set viewport to maximum size
-        page.set_viewport_size({"width": 1920, "height": 1080})
+        # Set viewport for all pages
+        default_viewport = {"width": 1920, "height": 1080}
+        for page in browser_context.pages:
+            page.set_viewport_size(default_viewport)
         
         return browser_context, temp_profile_path
     except Exception as e:
         # Clean up the temporary directory if something goes wrong
         shutil.rmtree(temp_profile_path, ignore_errors=True)
         raise e
-
 # Example usage:
 #if __name__ == "__main__":
     browser = launch_browser_with_profile()

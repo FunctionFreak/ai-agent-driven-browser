@@ -75,54 +75,39 @@ def execute_actions(page, ai_response: str):
                 except Exception as e:
                     logging.error(f"Navigation failed: {e}")
         
-        elif action == "click":
+        elif action == "input":
             selector = cmd.get("selector")
-            text = cmd.get("text")
+            text = cmd.get("text", "")
+            submit = cmd.get("submit", False)
             
-            # Special handling for Google cookie consent
-            if text and "accept" in text.lower():
-                try:
-                    # Try direct selectors for Google consent buttons
-                    consent_selectors = [
-                        "button[aria-label='Accept all']",
-                        "#L2AGLb",  # Google's consent button ID
-                        ".tHlp8d",  # Google's consent button class
-                        "form[action*='consent'] button",
-                        "div[role='dialog'] button:last-child",
-                        "button:has-text('Accept')",
-                        "button:has-text('Accept all')"
-                    ]
-                    
-                    for consent_selector in consent_selectors:
-                        try:
-                            if page.is_visible(consent_selector, timeout=1000):
-                                page.click(consent_selector)
-                                actions_performed.append(f"Clicked consent button with selector: {consent_selector}")
-                                # Wait to ensure the action completes
-                                page.wait_for_timeout(1000)
-                                break
-                        except:
-                            continue
-                    
-                    # If we couldn't click using selectors, try visible elements with matching text
-                    if not actions_performed:
-                        try:
-                            # Use evaluate to find and click the button via JavaScript
-                            page.evaluate('''() => {
-                                const buttons = Array.from(document.querySelectorAll('button'));
-                                const acceptButton = buttons.find(button => 
-                                    button.textContent.toLowerCase().includes('accept all') && 
-                                    button.offsetParent !== null
-                                );
-                                if (acceptButton) acceptButton.click();
-                            }''')
-                            actions_performed.append("Attempted to click Accept button via JavaScript")
-                            page.wait_for_timeout(1000)
-                        except Exception as e:
-                            logging.error(f"JavaScript click failed: {e}")
+            # Add a delay for page stabilization
+            page.wait_for_timeout(2000)
+            
+            # Google search specific handling
+            if "search" in text.lower() or "recipe" in text.lower():
+                # Try multiple selectors for Google's search box
+                search_selectors = [
+                    "textarea[name='q']",  # Google now often uses textarea instead of input
+                    "input[name='q']",
+                    "[aria-label='Search']",
+                    ".gLFyf"  # Google's search class
+                ]
+                
+                for search_selector in search_selectors:
+                    try:
+                        if page.is_visible(search_selector, timeout=1000):
+                            page.click(search_selector)
+                            page.fill(search_selector, text)
+                            actions_performed.append(f"Typed '{text}' into {search_selector}")
                             
-                except Exception as e:
-                    logging.error(f"Consent click action failed: {e}")
+                            if submit:
+                                page.press(search_selector, "Enter")
+                                actions_performed.append("Pressed Enter to search")
+                                page.wait_for_timeout(3000)  # Wait for results
+                            
+                            break
+                    except Exception as e:
+                        logging.error(f"Failed with selector {search_selector}: {e}")
             
             # Regular clicking logic
             elif selector:

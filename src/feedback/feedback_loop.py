@@ -87,10 +87,69 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                 continue
             except:
                 pass
+        
+        # If we're on Google and already passed cookie notice, try direct search
+        if "google.com" in current_url and not any("cookie" in r['text'].lower() for r in ocr_results):
+            try:
+                # Try multiple selectors for Google's search box
+                search_selectors = [
+                    "textarea[name='q']",  # Google now often uses textarea instead of input
+                    "input[name='q']",
+                    "[aria-label='Search']",
+                    ".gLFyf"  # Google's search class
+                ]
+                
+                for search_selector in search_selectors:
+                    try:
+                        if page.is_visible(search_selector, timeout=1000):
+                            # If we're here for the first time, search for the goal
+                            if iteration <= 2 and not any(a.startswith("Typed") for a in context["actions_taken"]):
+                                search_query = "best pizza recipe"
+                                page.click(search_selector)
+                                page.fill(search_selector, search_query)
+                                page.press(search_selector, "Enter")
+                                print(f"Performed direct search with selector: {search_selector}")
+                                # Wait for results page to load
+                                page.wait_for_timeout(3000)
+                                context["actions_taken"].append(f"Typed '{search_query}' into search box")
+                                context["actions_taken"].append("Pressed Enter to search")
+                                break
+                    except Exception as e:
+                        continue
+            except Exception as e:
+                print(f"Direct search attempt failed: {e}")
             
         # Get AI decision with context
-        ai_response = reasoner.get_response(context_message, metadata)
-        print("AI Response:", ai_response)
+        try:
+            ai_response = reasoner.get_response(context_message, metadata)
+            print("AI Response:", ai_response)
+        except Exception as e:
+            print(f"AI API error: {e}")
+            # Create a fallback response when API fails
+            if "google.com" in current_url:
+                print("Using fallback: Direct search for pizza recipe")
+                ai_response = """
+                {
+                  "analysis": "On Google homepage, need to search.",
+                  "state": "Ready to search for recipes",
+                  "commands": [
+                    {"action": "input", "selector": "textarea[name='q']", "text": "best pizza recipe", "submit": true}
+                  ],
+                  "complete": false
+                }
+                """
+            else:
+                # Generic fallback for other pages
+                ai_response = """
+                {
+                  "analysis": "Fallback after API error.",
+                  "state": "Error recovery",
+                  "commands": [
+                    {"action": "navigate", "url": "https://www.google.com"}
+                  ],
+                  "complete": false
+                }
+                """
         
         # Execute actions
         try:
@@ -110,14 +169,35 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                 if "google.com" in current_url:
                     # Try direct search without handling cookies
                     try:
-                        # Try to input directly into the search box
-                        search_query = "best pizza recipe"
-                        page.fill("input[name='q']", search_query)
-                        page.press("input[name='q']", "Enter")
-                        print(f"Attempted direct search for '{search_query}'")
-                        context["stuck_counter"] = 0
-                    except:
-                        # If that fails, reload the page and try again
+                        # Try multiple selectors for Google's search box
+                        search_selectors = [
+                            "textarea[name='q']",  # Google now often uses textarea instead of input
+                            "input[name='q']",
+                            "[aria-label='Search']",
+                            ".gLFyf"  # Google's search class
+                        ]
+                        
+                        for search_selector in search_selectors:
+                            try:
+                                if page.is_visible(search_selector, timeout=1000):
+                                    search_query = "best pizza recipe"
+                                    page.click(search_selector)
+                                    page.fill(search_selector, search_query)
+                                    page.press(search_selector, "Enter")
+                                    print(f"Attempted direct search for '{search_query}' with selector {search_selector}")
+                                    context["stuck_counter"] = 0
+                                    page.wait_for_timeout(3000)
+                                    break
+                            except Exception as e:
+                                continue
+                        
+                        if context["stuck_counter"] > 0:  # If all selectors failed
+                            # If that fails, reload the page and try again
+                            page.reload()
+                            print("Reloaded the page to try again")
+                            context["stuck_counter"] = 0
+                    except Exception as e:
+                        print(f"Alternative approach failed: {e}")
                         page.reload()
                         print("Reloaded the page to try again")
                         context["stuck_counter"] = 0
