@@ -1,64 +1,58 @@
 # File: src/main.py
 
 import os
+import logging
+import shutil
 from dotenv import load_dotenv
 
-# Playwright imports
-from playwright.sync_api import sync_playwright
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 # Project imports
 from src.automation.playwright_controller import launch_browser_with_profile
-from src.capture.screen_capture import capture_screenshot
-from src.vision.yolov8_detector import YOLOv8Detector
-from src.vision.ocr_processor import OCRProcessor
-from src.metadata.metadata_generator import MetadataGenerator
-from src.reasoning.deepseek_reasoner import DeepSeekReasoner
-from src.automation.action_executor import execute_actions
+from src.feedback.feedback_loop import feedback_loop
 
 def main():
-    # 1. Load environment variables (.env must contain GROQ_API_KEY and CHROME_PROFILE_PATH)
+    # Load environment variables
     load_dotenv()
+    
+    print("===== AI-Driven Browser Automation =====")
+    print("This agent will use AI to complete browsing tasks autonomously.")
+    print("Examples of tasks you can request:")
+    print("- 'Search for iPhone 16 Pro on Amazon'")
+    print("- 'Find a good pizza recipe'")
+    print("- 'Look up the weather forecast for New York'")
+    print("- 'Check the top news headlines'")
+    print()
 
-    # 2. Ask user for a command
-    user_command = input("Enter your command for the AI-driven browser automation: ")
-
-    # 3. Launch a persistent browser session (make sure headless=False if you want to see the browser)
-    browser_context = launch_browser_with_profile()  # headless=False is set inside that function
+    # Get high-level goal from the user
+    user_goal = input("What would you like the browser agent to do? ")
+    
+    print("\nLaunching browser and starting autonomous agent...")
+    print("(Press Ctrl+C at any time to stop the process)")
+    
+    # Launch browser with persistent profile (using temporary copy)
+    browser_context, temp_profile_path = launch_browser_with_profile()
     page = browser_context.new_page()
     
-    # (No initial page.goto() call—so the AI alone decides where to navigate.)
-
-    # 4. Capture a screenshot of the current page (likely blank or default)
-    screenshot_path = capture_screenshot(page)
-    print(f"Screenshot saved at: {screenshot_path}")
-
-    # 5. Run YOLOv8 for object detection
-    detector = YOLOv8Detector(model_variant='yolov8l.pt')
-    object_detections = detector.detect(screenshot_path)
-
-    # 6. Run OCR to extract text
-    ocr = OCRProcessor()
-    ocr_results = ocr.process_image(screenshot_path)
-
-    # 7. Generate metadata from detections + OCR
-    meta_gen = MetadataGenerator()
-    metadata = meta_gen.generate_metadata(object_detections, ocr_results)
-    # (Optional) save metadata to file
-    meta_gen.save_metadata(metadata, file_path="metadata.json")
-
-    # 8. Use DeepSeek reasoning to decide the next action
-    reasoner = DeepSeekReasoner()
-    ai_response = reasoner.get_response(user_command, metadata)
-    print("AI Response:", ai_response)
-
-    # 9. Execute the commands from the AI response (e.g., navigate to https://www.google.com)
-    execute_actions(page, ai_response)
-
-    # (Optional) Wait a bit so you can see the result before closing
-    page.wait_for_timeout(5000)
-
-    # 10. Close the browser context
-    browser_context.close()
+    try:
+        # Run the continuous feedback loop with the enhanced version
+        feedback_loop(page, user_goal, max_iterations=20, interval=3)
+    except KeyboardInterrupt:
+        print("\nProcess interrupted by user.")
+    except Exception as e:
+        logging.error(f"Error during execution: {e}")
+    finally:
+        # Let the user see the final state before closing
+        input("\nPress Enter to close the browser...")
+        browser_context.close()
+        
+        # Clean up the temporary profile
+        print(f"Cleaning up temporary Chrome profile...")
+        shutil.rmtree(temp_profile_path, ignore_errors=True)
 
 if __name__ == "__main__":
     main()

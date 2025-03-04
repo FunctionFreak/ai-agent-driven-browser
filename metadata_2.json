@@ -1,0 +1,807 @@
+{
+  "timestamp": "2025-03-04T16:55:48.287946",
+  "object_detections": [
+    {
+      "bbox": [
+        233.42312622070312,
+        1.35443115234375,
+        1031.427001953125,
+        710.9695434570312
+      ],
+      "confidence": 0.5391444563865662,
+      "class": 63
+    },
+    {
+      "bbox": [
+        231.3956298828125,
+        0.87237548828125,
+        1029.8973388671875,
+        711.497314453125
+      ],
+      "confidence": 0.4212092161178589,
+      "class": 62
+    },
+    {
+      "bbox": [
+        233.1224365234375,
+        1.98291015625,
+        1031.3118896484375,
+        710.4495849609375
+      ],
+      "confidence": 0.2967938780784607,
+      "class": 73
+    }
+  ],
+  "ocr_results": [
+    {
+      "bbox": [
+        [
+          1056.0,
+          22.0
+        ],
+        [
+          1103.0,
+          22.0
+        ],
+        [
+          1103.0,
+          40.0
+        ],
+        [
+          1056.0,
+          40.0
+        ]
+      ],
+      "text": "Images",
+      "confidence": 0.7192410452056981
+    },
+    {
+      "bbox": [
+        [
+          1189.0,
+          23.0
+        ],
+        [
+          1237.0,
+          23.0
+        ],
+        [
+          1237.0,
+          39.0
+        ],
+        [
+          1189.0,
+          39.0
+        ]
+      ],
+      "text": "Sign in",
+      "confidence": 0.997800307737098
+    },
+    {
+      "bbox": [
+        [
+          861.0,
+          39.0
+        ],
+        [
+          885.0,
+          39.0
+        ],
+        [
+          885.0,
+          57.0
+        ],
+        [
+          861.0,
+          57.0
+        ]
+      ],
+      "text": "EN",
+      "confidence": 0.9999165502598186
+    },
+    {
+      "bbox": [
+        [
+          933.0,
+          39.0
+        ],
+        [
+          981.0,
+          39.0
+        ],
+        [
+          981.0,
+          59.0
+        ],
+        [
+          933.0,
+          59.0
+        ]
+      ],
+      "text": "Sign in",
+      "confidence": 0.6656719964897438
+    },
+    {
+      "bbox": [
+        [
+          439.0,
+          91.0
+        ],
+        [
+          827.0,
+          91.0
+        ],
+        [
+          827.0,
+          129.0
+        ],
+        [
+          439.0,
+          129.0
+        ]
+      ],
+      "text": "Before you continue to Google",
+      "confidence": 0.8944849247719077
+    },
+    {
+      "bbox": [
+        [
+          263.0,
+          149.0
+        ],
+        [
+          443.0,
+          149.0
+        ],
+        [
+          443.0,
+          165.0
+        ],
+        [
+          263.0,
+          165.0
+        ]
+      ],
+      "text": "We use cookies and data t0",
+      "confidence": 0.9669119902411851
+    },
+    {
+      "bbox": [
+        [
+          297.0,
+          181.0
+        ],
+        [
+          539.0,
+          181.0
+        ],
+        [
+          539.0,
+          199.0
+        ],
+        [
+          297.0,
+          199.0
+        ]
+      ],
+      "text": "Deliver and maintain Google services",
+      "confidence": 0.8338284957124766
+    },
+    {
+      "bbox": [
+        [
+          297.0,
+          211.0
+        ],
+        [
+          669.0,
+          211.0
+        ],
+        [
+          669.0,
+          231.0
+        ],
+        [
+          297.0,
+          231.0
+        ]
+      ],
+      "text": "Track outages and protect against spam, fraud and abuse",
+      "confidence": 0.6011058547445763
+    },
+    {
+      "bbox": [
+        [
+          297.0,
+          244.0
+        ],
+        [
+          993.0,
+          244.0
+        ],
+        [
+          993.0,
+          264.0
+        ],
+        [
+          297.0,
+          264.0
+        ]
+      ],
+      "text": "Measure audience engagement and site statistics to understand how our services are used and enhance the",
+      "confidence": 0.7802809031857614
+    },
+    {
+      "bbox": [
+        [
+          297.0,
+          265.0
+        ],
+        [
+          455.0,
+          265.0
+        ],
+        [
+          455.0,
+          283.0
+        ],
+        [
+          297.0,
+          283.0
+        ]
+      ],
+      "text": "quality of those services",
+      "confidence": 0.9134686509948234
+    },
+    {
+      "bbox": [
+        [
+          263.0,
+          307.0
+        ],
+        [
+          679.0,
+          307.0
+        ],
+        [
+          679.0,
+          327.0
+        ],
+        [
+          263.0,
+          327.0
+        ]
+      ],
+      "text": "If you choose to 'Accept all' ; we will also use cookies and data to",
+      "confidence": 0.5459232075056255
+    },
+    {
+      "bbox": [
+        [
+          297.0,
+          341.0
+        ],
+        [
+          523.0,
+          341.0
+        ],
+        [
+          523.0,
+          357.0
+        ],
+        [
+          297.0,
+          357.0
+        ]
+      ],
+      "text": "Develop and improve new services",
+      "confidence": 0.7930652400076047
+    },
+    {
+      "bbox": [
+        [
+          297.0,
+          372.0
+        ],
+        [
+          589.0,
+          372.0
+        ],
+        [
+          589.0,
+          389.0
+        ],
+        [
+          297.0,
+          389.0
+        ]
+      ],
+      "text": "Deliver and measure the effectiveness of ads",
+      "confidence": 0.5880179272946645
+    },
+    {
+      "bbox": [
+        [
+          297.0,
+          403.0
+        ],
+        [
+          655.0,
+          403.0
+        ],
+        [
+          655.0,
+          423.0
+        ],
+        [
+          297.0,
+          423.0
+        ]
+      ],
+      "text": "Show personalised content, depending on your settings",
+      "confidence": 0.7492577663935804
+    },
+    {
+      "bbox": [
+        [
+          297.0,
+          435.0
+        ],
+        [
+          631.0,
+          435.0
+        ],
+        [
+          631.0,
+          455.0
+        ],
+        [
+          297.0,
+          455.0
+        ]
+      ],
+      "text": "Show personalised ads, depending on your settings",
+      "confidence": 0.879533379374052
+    },
+    {
+      "bbox": [
+        [
+          263.0,
+          467.0
+        ],
+        [
+          439.0,
+          467.0
+        ],
+        [
+          439.0,
+          487.0
+        ],
+        [
+          263.0,
+          487.0
+        ]
+      ],
+      "text": "If you choose to 'Reject all' ,",
+      "confidence": 0.5190353990779815
+    },
+    {
+      "bbox": [
+        [
+          443.0,
+          469.0
+        ],
+        [
+          715.0,
+          469.0
+        ],
+        [
+          715.0,
+          485.0
+        ],
+        [
+          443.0,
+          485.0
+        ]
+      ],
+      "text": "we will not use cookies for these additiona",
+      "confidence": 0.694323063575708
+    },
+    {
+      "bbox": [
+        [
+          721.0,
+          471.0
+        ],
+        [
+          783.0,
+          471.0
+        ],
+        [
+          783.0,
+          487.0
+        ],
+        [
+          721.0,
+          487.0
+        ]
+      ],
+      "text": "purposes:",
+      "confidence": 0.9457889347132346
+    },
+    {
+      "bbox": [
+        [
+          263.0,
+          511.0
+        ],
+        [
+          963.0,
+          511.0
+        ],
+        [
+          963.0,
+          532.0
+        ],
+        [
+          263.0,
+          532.0
+        ]
+      ],
+      "text": "Non-personalised content is influenced by things like the content that you re currently viewing, activity in your",
+      "confidence": 0.7209000079415995
+    },
+    {
+      "bbox": [
+        [
+          263.0,
+          533.0
+        ],
+        [
+          995.0,
+          533.0
+        ],
+        [
+          995.0,
+          551.0
+        ],
+        [
+          263.0,
+          551.0
+        ]
+      ],
+      "text": "active Search session; and your Iocation. Non-personalised ads are influenced by the content that you're currently",
+      "confidence": 0.6442879840127188
+    },
+    {
+      "bbox": [
+        [
+          262.0,
+          552.0
+        ],
+        [
+          925.0,
+          552.0
+        ],
+        [
+          925.0,
+          571.0
+        ],
+        [
+          262.0,
+          571.0
+        ]
+      ],
+      "text": "viewing and your general location. Personalised content and ads can also include more relevant results",
+      "confidence": 0.7429347801030024
+    },
+    {
+      "bbox": [
+        [
+          263.0,
+          573.0
+        ],
+        [
+          975.0,
+          573.0
+        ],
+        [
+          975.0,
+          591.0
+        ],
+        [
+          263.0,
+          591.0
+        ]
+      ],
+      "text": "recommendations and tailored ads based on past activity from this browser; like previous Google searches: We",
+      "confidence": 0.6037037292462911
+    },
+    {
+      "bbox": [
+        [
+          263.0,
+          593.0
+        ],
+        [
+          725.0,
+          593.0
+        ],
+        [
+          725.0,
+          611.0
+        ],
+        [
+          263.0,
+          611.0
+        ]
+      ],
+      "text": "also use cookies and data to tailor the experience to be age-appropriate",
+      "confidence": 0.6411750925693716
+    },
+    {
+      "bbox": [
+        [
+          731.0,
+          593.0
+        ],
+        [
+          799.0,
+          593.0
+        ],
+        [
+          799.0,
+          609.0
+        ],
+        [
+          731.0,
+          609.0
+        ]
+      ],
+      "text": "if relevant",
+      "confidence": 0.9391001285247204
+    },
+    {
+      "bbox": [
+        [
+          263.0,
+          625.0
+        ],
+        [
+          997.0,
+          625.0
+        ],
+        [
+          997.0,
+          645.0
+        ],
+        [
+          263.0,
+          645.0
+        ]
+      ],
+      "text": "Select 'More options' to see additional information; including details about managing your privacy settings. You can",
+      "confidence": 0.7292425053255412
+    },
+    {
+      "bbox": [
+        [
+          27.0,
+          639.0
+        ],
+        [
+          139.0,
+          639.0
+        ],
+        [
+          139.0,
+          659.0
+        ],
+        [
+          27.0,
+          659.0
+        ]
+      ],
+      "text": "United Kingdom",
+      "confidence": 0.8694475296447853
+    },
+    {
+      "bbox": [
+        [
+          263.0,
+          646.0
+        ],
+        [
+          509.0,
+          646.0
+        ],
+        [
+          509.0,
+          663.0
+        ],
+        [
+          263.0,
+          663.0
+        ]
+      ],
+      "text": "also visit g colprivacytools at any time.",
+      "confidence": 0.7856844779340401
+    },
+    {
+      "bbox": [
+        [
+          35.0,
+          689.0
+        ],
+        [
+          75.0,
+          689.0
+        ],
+        [
+          75.0,
+          705.0
+        ],
+        [
+          35.0,
+          705.0
+        ]
+      ],
+      "text": "About",
+      "confidence": 0.9999666799251039
+    },
+    {
+      "bbox": [
+        [
+          100.0,
+          687.0
+        ],
+        [
+          173.0,
+          687.0
+        ],
+        [
+          173.0,
+          707.0
+        ],
+        [
+          100.0,
+          707.0
+        ]
+      ],
+      "text": "Advertising",
+      "confidence": 0.8996962746971646
+    },
+    {
+      "bbox": [
+        [
+          201.0,
+          689.0
+        ],
+        [
+          235.0,
+          689.0
+        ],
+        [
+          235.0,
+          705.0
+        ],
+        [
+          201.0,
+          705.0
+        ]
+      ],
+      "text": "Busin",
+      "confidence": 0.7337414940122817
+    },
+    {
+      "bbox": [
+        [
+          1048.0,
+          688.0
+        ],
+        [
+          1099.0,
+          688.0
+        ],
+        [
+          1099.0,
+          706.0
+        ],
+        [
+          1048.0,
+          706.0
+        ]
+      ],
+      "text": "Privacy",
+      "confidence": 0.9804351287079094
+    },
+    {
+      "bbox": [
+        [
+          1125.0,
+          689.0
+        ],
+        [
+          1167.0,
+          689.0
+        ],
+        [
+          1167.0,
+          705.0
+        ],
+        [
+          1125.0,
+          705.0
+        ]
+      ],
+      "text": "Terms",
+      "confidence": 0.999893375299031
+    },
+    {
+      "bbox": [
+        [
+          1192.0,
+          687.0
+        ],
+        [
+          1247.0,
+          687.0
+        ],
+        [
+          1247.0,
+          707.0
+        ],
+        [
+          1192.0,
+          707.0
+        ]
+      ],
+      "text": "Settings",
+      "confidence": 0.9996879667143407
+    },
+    {
+      "bbox": [
+        [
+          499.0,
+          701.0
+        ],
+        [
+          561.0,
+          701.0
+        ],
+        [
+          561.0,
+          717.0
+        ],
+        [
+          499.0,
+          717.0
+        ]
+      ],
+      "text": "Reject all ",
+      "confidence": 0.8309837774902271
+    },
+    {
+      "bbox": [
+        [
+          703.0,
+          701.0
+        ],
+        [
+          767.0,
+          701.0
+        ],
+        [
+          767.0,
+          717.0
+        ],
+        [
+          703.0,
+          717.0
+        ]
+      ],
+      "text": "Accept all",
+      "confidence": 0.9710059639219248
+    }
+  ]
+}

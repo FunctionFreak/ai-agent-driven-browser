@@ -22,45 +22,107 @@ class DeepSeekReasoner:
 
     def get_response(self, user_message: str, metadata: dict, temperature: float = 0.7, max_tokens: int = 1000) -> str:
         """
-        Get a response from DeepSeek model by passing the current conversation and metadata as context.
+        Get a response from DeepSeek model by passing the current context and metadata.
         
-        :param user_message: The current user message.
+        :param user_message: The current context message (containing goal and state).
         :param metadata: A dictionary containing vision output (detections and OCR results).
         :param temperature: Sampling temperature for response generation.
         :param max_tokens: Maximum tokens to generate in the response.
         :return: The AI-generated response.
         """
-        # Prepare a summary context from the metadata.
-        metadata_summary = f"Metadata summary: {metadata}\n"
-        # Optionally, include recent conversation history (for brevity, you could limit this)
-        conversation_history = self.chat_logger.get_conversation()
-        conversation_summary = ""
-        for entry in conversation_history[-5:]:
-            conversation_summary += f"{entry['role'].capitalize()}: {entry['content']}\n"
+        # Create a detailed summary of what's visible on the page
+        ocr_texts = [item.get('text', '') for item in metadata.get('ocr_results', [])]
+        ocr_summary = ", ".join(ocr_texts) if ocr_texts else "No text detected"
         
-        # Combine the metadata summary, conversation history, and the current user message
-        prompt_message = metadata_summary + conversation_summary + f"User: {user_message}"
+        # Number of objects detected
+        num_objects = len(metadata.get('object_detections', []))
+        
+        # Craft a detailed system prompt that helps the model understand its task
+        system_prompt = """You are an autonomous browser agent that can see and interact with web pages. Your goal is to accomplish the user's task by breaking it down into smaller steps and reasoning about the current state.
 
+# WORKFLOW:
+1. ANALYZE THE CURRENT STATE:
+   - Analyze what page you're on and what elements are visible
+   - Check if there are any blocking elements (cookie banners, login prompts, popups)
+   - Identify the interactive elements needed to progress toward the goal
+   
+2. NAVIGATION PATH:
+   - If you need to visit a specific website, navigate there directly if URL is known
+   - Otherwise, use Google search to find relevant pages
+   - When using search engines, use specific, well-formed queries related to the task
+
+3. ELEMENT INTERACTION:
+   - For cookie banners or consent prompts, look for "Accept", "I agree", or "Continue"
+   - For Google search, specifically use the selector "input[name='q']" for the search box
+   - For navigation, find and click on the most relevant links
+   - For forms, fill in required fields and submit
+
+4. PROGRESS TRACKING:
+   - Keep track of what has been done and what remains
+   - Handle any unexpected situations that arise
+   - Signal when the task is complete
+
+# OUTPUT FORMAT:
+Always respond with a valid JSON object containing:
+{
+  "analysis": "Detailed description of what you observe on the screen",
+  "state": "Current progress toward the goal",
+  "challenges": "Any obstacles or difficulties encountered",
+  "next_steps": "Future steps after the current action",
+  "commands": [
+    {"action": "navigate", "url": "https://example.com"},
+    {"action": "click", "text": "Accept all"},
+    {"action": "input", "selector": "input[name='q']", "text": "query", "submit": true},
+    {"action": "scroll", "direction": "down", "amount": 300}
+  ],
+  "complete": false
+}
+
+When on Google:
+- For search, always use selector "input[name='q']" specifically
+- For accepting cookies, try to use the text "Accept all"
+- If you're stuck, try a direct search without worrying about cookies
+
+Make decisions based on the OCR text you can see on the page. Focus on moving towards the goal step by step.
+"""
+
+        # Construct a detailed prompt with context and visuals
+        prompt_message = f"""
+    CURRENT GOAL AND STATE:
+    {user_message}
+
+    VISUAL INFORMATION:
+    - OCR detected text: {ocr_summary}
+    - Number of UI elements detected: {num_objects}
+
+    Based on what you can see and where you are, what's the next best action to take to achieve the goal?
+    """
+
+        # Call the DeepSeek API
         payload = {
             "model": self.model_name,
             "messages": [
-                {"role": "system", "content": "You are an AI automation assistant. When given metadata and a user command, output only a valid JSON object with a 'commands' array. Each command should be formatted as: { 'action': 'navigate', 'url': 'https://example.com' } (or similar for 'click' or 'input'). Do not include any additional text or explanations."},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt_message}
             ],
             "temperature": temperature,
             "max_tokens": max_tokens
         }
+        
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
+        
         response = requests.post(self.groq_api_url, json=payload, headers=headers)
         if response.status_code == 200:
             result = response.json()
             answer = result["choices"][0]["message"]["content"]
+            
             # Log both the user message and the assistant response for future context
             self.chat_logger.log_message("user", user_message)
             self.chat_logger.log_message("assistant", answer)
+            
             return answer
         else:
             raise Exception(f"Error: {response.status_code} - {response.text}")

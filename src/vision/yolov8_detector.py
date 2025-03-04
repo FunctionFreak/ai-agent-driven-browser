@@ -5,9 +5,12 @@ class YOLOv8Detector:
     def __init__(self, model_variant: str = 'yolov8l.pt'):
         """
         Initialize the YOLOv8 model with the given variant.
+        Force CPU usage to avoid CUDA compatibility issues.
         """
+        # Force CPU device to avoid CUDA issues
         self.model = YOLO(model_variant)
-
+        self.model.to('cpu')  # Force CPU usage
+        
     def detect(self, image_path: str):
         """
         Perform object detection on the provided image.
@@ -15,7 +18,7 @@ class YOLOv8Detector:
         :param image_path: The path to the input image.
         :return: List of detections with bounding boxes, confidence scores, and class indices.
         """
-        results = self.model(image_path)
+        results = self.model(image_path, device='cpu')  # Explicitly specify CPU
         detections = []
         
         for result in results:

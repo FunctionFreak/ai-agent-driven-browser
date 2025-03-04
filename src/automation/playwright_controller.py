@@ -1,4 +1,8 @@
+# In src/automation/playwright_controller.py
+
 import os
+import shutil
+import tempfile
 from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
 
@@ -7,22 +11,61 @@ load_dotenv()
 
 def launch_browser_with_profile():
     """
-    Launches a persistent Chrome browser session using the user profile defined in CHROME_PROFILE_PATH.
+    Launches a persistent Chrome browser session using a temporary copy of 
+    the user profile defined in CHROME_PROFILE_PATH.
     """
     chrome_profile_path = os.getenv("CHROME_PROFILE_PATH")
     if not chrome_profile_path:
         raise ValueError("CHROME_PROFILE_PATH not set in environment variables.")
     
-    playwright = sync_playwright().start()
-    # Launch a persistent Chromium instance using the user data directory
-    browser_context = playwright.chromium.launch_persistent_context(
-        user_data_dir=chrome_profile_path,
-        headless=False  # Set to False if you want to see the browser window during debugging
-    )
-    return browser_context
+    # Create a temporary directory for the profile copy
+    temp_profile_path = tempfile.mkdtemp(prefix="chrome_profile_copy_")
+    print(f"Creating temporary Chrome profile at: {temp_profile_path}")
+    
+    try:
+        # Copy essential profile data
+        os.makedirs(os.path.join(temp_profile_path, "Default"), exist_ok=True)
+        
+        source_default = os.path.join(chrome_profile_path, "Default")
+        target_default = os.path.join(temp_profile_path, "Default")
+        
+        essential_files = ["Preferences", "Cookies", "Login Data", "Web Data"]
+        
+        for file in essential_files:
+            source = os.path.join(source_default, file)
+            target = os.path.join(target_default, file)
+            if os.path.exists(source):
+                try:
+                    shutil.copy2(source, target)
+                except:
+                    pass
+        
+        # Launch Playwright with the temporary profile and maximized window
+        playwright = sync_playwright().start()
+        browser_context = playwright.chromium.launch_persistent_context(
+            user_data_dir=temp_profile_path,
+            headless=False,
+            args=["--start-maximized"]  # Add this arg to start maximized
+        )
+        
+        # Explicitly set the viewport to a large size
+        pages = browser_context.pages
+        if len(pages) == 0:
+            page = browser_context.new_page()
+        else:
+            page = pages[0]
+            
+        # Set viewport to maximum size
+        page.set_viewport_size({"width": 1920, "height": 1080})
+        
+        return browser_context, temp_profile_path
+    except Exception as e:
+        # Clean up the temporary directory if something goes wrong
+        shutil.rmtree(temp_profile_path, ignore_errors=True)
+        raise e
 
 # Example usage:
-if __name__ == "__main__":
+#if __name__ == "__main__":
     browser = launch_browser_with_profile()
     page = browser.new_page()
     page.goto("https://example.com")
