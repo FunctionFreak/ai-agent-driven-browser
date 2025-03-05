@@ -3,6 +3,8 @@
 import os
 import logging
 import shutil
+import random
+import time
 from dotenv import load_dotenv
 
 # Configure logging
@@ -34,25 +36,43 @@ def main():
     print("\nLaunching browser and starting autonomous agent...")
     print("(Press Ctrl+C at any time to stop the process)")
     
-    # Launch browser with persistent profile (using temporary copy)
-    browser_context, temp_profile_path = launch_browser_with_profile()
-    page = browser_context.new_page()
+    # Show a more human-like startup message
+    startup_messages = [
+        "Initializing browser environment...",
+        "Setting up AI-driven automation...",
+        "Preparing to navigate the web...",
+        "Starting autonomous browsing session..."
+    ]
     
+    for message in startup_messages:
+        print(message)
+        # Random delay between messages
+        time.sleep(random.uniform(0.3, 1.0))
+    
+    # Launch browser with persistent profile
     try:
-        # Run the continuous feedback loop with the enhanced version
-        feedback_loop(page, user_goal, max_iterations=20, interval=3)
-    except KeyboardInterrupt:
-        print("\nProcess interrupted by user.")
-    except Exception as e:
-        logging.error(f"Error during execution: {e}")
-    finally:
-        # Let the user see the final state before closing
-        input("\nPress Enter to close the browser...")
-        browser_context.close()
+        browser_context, temp_profile_path = launch_browser_with_profile()
+        page = browser_context.new_page()
         
-        # Clean up the temporary profile
-        print(f"Cleaning up temporary Chrome profile...")
-        shutil.rmtree(temp_profile_path, ignore_errors=True)
+        try:
+            # Run the continuous feedback loop with the enhanced version
+            feedback_loop(page, user_goal, max_iterations=20, interval=3)
+        except KeyboardInterrupt:
+            print("\nProcess interrupted by user.")
+        except Exception as e:
+            logging.error(f"Error during execution: {e}")
+        finally:
+            # Let the user see the final state before closing
+            input("\nPress Enter to close the browser...")
+            browser_context.close()
+            
+            # Clean up the temporary profile if one was created
+            if temp_profile_path:
+                print(f"Cleaning up temporary Chrome profile...")
+                shutil.rmtree(temp_profile_path, ignore_errors=True)
+    except Exception as e:
+        logging.error(f"Failed to launch browser: {e}")
+        print("\nError: Could not start the browser. Please check your Chrome installation and configuration.")
 
 if __name__ == "__main__":
     main()
