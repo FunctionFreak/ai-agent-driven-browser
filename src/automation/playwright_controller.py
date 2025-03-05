@@ -59,59 +59,39 @@ def apply_stealth_mode(page):
 
 def launch_browser_with_profile():
     """
-    Launches a persistent Chrome browser session with stealth mode to avoid detection.
+    Launches Chrome browser using your actual profile to maintain all settings/login state
     """
     chrome_profile_path = os.getenv("CHROME_PROFILE_PATH")
     if not chrome_profile_path:
         raise ValueError("CHROME_PROFILE_PATH not set in environment variables.")
     
-    # Get path to Chrome executable (try default locations)
-    chrome_executable_path = None
-    possible_paths = [
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-        "/usr/bin/google-chrome"
-    ]
+    # Verify this is the User Data directory and not a specific profile
+    if chrome_profile_path.endswith("Default"):
+        # Strip off the "Default" part if it was incorrectly included
+        chrome_profile_path = chrome_profile_path.replace("\\Default", "")
+        print(f"Adjusting profile path to: {chrome_profile_path}")
     
-    for path in possible_paths:
-        if os.path.exists(path):
-            chrome_executable_path = path
-            break
-    
-    # Create a temporary directory for the profile copy
-    temp_profile_path = tempfile.mkdtemp(prefix="chrome_profile_copy_")
-    print(f"Creating temporary Chrome profile at: {temp_profile_path}")
+    # Get path to Chrome executable
+    chrome_executable_path = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+    if not os.path.exists(chrome_executable_path):
+        # Fallback to auto-detection
+        chrome_executable_path = None
+        print("Chrome executable not found at expected path, using auto-detection")
     
     try:
-        # Copy essential profile data
-        os.makedirs(os.path.join(temp_profile_path, "Default"), exist_ok=True)
-        
-        source_default = os.path.join(chrome_profile_path, "Default")
-        target_default = os.path.join(temp_profile_path, "Default")
-        
-        # Copy more profile files for better persistence of cookies and login state
-        essential_files = [
-            "Preferences", "Cookies", "Login Data", "Web Data", 
-            "History", "Bookmarks", "Favicons", "TransportSecurity",
-            "Network Action Predictor", "Extension Cookies"
-        ]
-        
-        for file in essential_files:
-            source = os.path.join(source_default, file)
-            target = os.path.join(target_default, file)
-            if os.path.exists(source):
-                try:
-                    shutil.copy2(source, target)
-                except Exception as e:
-                    print(f"Could not copy {file}: {e}")
-        
-        # Launch Playwright with the profile and stealth mode
+        # Launch Playwright with the actual profile (no temporary copy)
         playwright = sync_playwright().start()
+        
+        # Use a specific browser profile if needed (e.g., profile 1)
+        # If you want to use the Default profile, don't set this parameter
+        # profile_name = None  # For Default profile
+        # profile_name = "Profile 1"  # For a specific named profile
+        
         browser_context = playwright.chromium.launch_persistent_context(
-            user_data_dir=temp_profile_path,
+            user_data_dir=chrome_profile_path,  # Your actual Chrome profile directory
             headless=False,
             executable_path=chrome_executable_path,
+            # channel="chrome",  # Uncomment to use your installed Chrome instead of bundled Chromium
             args=[
                 "--start-maximized", 
                 "--window-size=1920,1080",
@@ -119,16 +99,14 @@ def launch_browser_with_profile():
             ]
         )
         
-        # Set viewport for all pages and apply stealth mode
-        default_viewport = {"width": 1920, "height": 1080}
+        # Apply stealth mode to all pages
         for page in browser_context.pages:
-            page.set_viewport_size(default_viewport)
+            page.set_viewport_size({"width": 1920, "height": 1080})
             apply_stealth_mode(page)
         
-        return browser_context, temp_profile_path
+        return browser_context, None  # Return None as second param since we don't need to clean up
     except Exception as e:
-        # Clean up the temporary directory if something goes wrong
-        shutil.rmtree(temp_profile_path, ignore_errors=True)
+        print(f"Error launching browser: {e}")
         raise e
 # Example usage:
 #if __name__ == "__main__":

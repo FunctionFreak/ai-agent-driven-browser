@@ -66,7 +66,7 @@ def main():
             input("\nPress Enter to close the browser...")
             browser_context.close()
             
-            # Clean up the temporary profile if one was created
+            # Only clean up temporary profile if one was created
             if temp_profile_path:
                 print(f"Cleaning up temporary Chrome profile...")
                 shutil.rmtree(temp_profile_path, ignore_errors=True)

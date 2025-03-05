@@ -3,6 +3,9 @@ import re
 import logging
 import random
 import time
+# At the top of the file, add these imports:
+from src.vision.ocr_processor import OCRProcessor
+from src.capture.screen_capture import capture_screenshot
 
 def extract_json(response_text: str):
     """
@@ -94,7 +97,7 @@ def move_mouse_naturally(page, target_x, target_y):
             page.mouse.move(x, y)
             
             # Add small delay between movements
-            time.sleep(random.uniform(0.01, 0.03))
+            time.sleep(random.uniform(0.005, 0.02))
             
     except Exception as e:
         logging.error(f"Natural mouse movement failed: {e}")
@@ -121,8 +124,8 @@ def execute_actions(page, ai_response: str):
     commands = commands_data.get("commands", [])
     
     for cmd in commands:
-        # Add human-like delay between actions (1-6 seconds)
-        delay = random.uniform(1.0, 6.0)
+        # Add human-like delay between actions (1-2 seconds)
+        delay = random.uniform(0.5, 2.0)
         logging.info(f"Adding human-like delay of {delay:.1f} seconds")
         time.sleep(delay)
         
@@ -145,6 +148,7 @@ def execute_actions(page, ai_response: str):
         elif action == "click":
             selector = cmd.get("selector")
             text = cmd.get("text")
+            submit = cmd.get("submit", False)
             
             # Special handling for Google cookie consent
             if text and ("accept" in text.lower() or "agree" in text.lower()):
@@ -280,6 +284,40 @@ def execute_actions(page, ai_response: str):
                     actions_performed.append(f"Handled cookie consent banner")
                     continue
             
+            # Special handling for search result links
+            elif "search?" in page.url and (text and ("recipe" in text.lower() or not text.startswith("http"))):
+                try:
+                    # Try to find and click on a natural (non-sponsored) result
+                    print("Looking for natural search results...")
+                    natural_result = find_natural_search_results(page)
+                    
+                    if natural_result:
+                        # Get position for mouse movement
+                        element_position = natural_result.bounding_box()
+                        if element_position:
+                            # Move mouse naturally to the element center
+                            center_x = element_position["x"] + element_position["width"] / 2
+                            center_y = element_position["y"] + element_position["height"] / 2
+                            move_mouse_naturally(page, center_x, center_y)
+                        
+                        # Click the natural result
+                        natural_result.click()
+                        actions_performed.append(f"Clicked natural search result")
+                        page.wait_for_timeout(2000)  # Wait for the page to load
+                    else:
+                        # Fallback to regular clicking if no natural results found
+                        if text:
+                            for strategy in text_strategies:
+                                try:
+                                    if page.is_visible(strategy, timeout=1000):
+                                        page.click(strategy)
+                                        actions_performed.append(f"Clicked element with text: {text}")
+                                        break
+                                except:
+                                    continue
+                except Exception as e:
+                    logging.error(f"Error clicking natural search result: {e}")
+            
             # Regular input handling with human-like typing
             elif selector:
                 try:
@@ -338,14 +376,14 @@ def execute_actions(page, ai_response: str):
                         page.evaluate(f"window.scrollBy(0, -{chunk})")
                     
                     # Variable pause between scroll chunks
-                    time.sleep(random.uniform(0.05, 0.15))
+                    time.sleep(random.uniform(0.03, 0.10))
                 
                 actions_performed.append(f"Scrolled {direction} {amount} pixels")
             except Exception as e:
                 logging.error(f"Scroll failed: {e}")
         
         # Wait after each action with a variable delay
-        page.wait_for_timeout(random.randint(500, 2000))
+        page.wait_for_timeout(random.randint(300, 1000))
     
     return actions_performed
 
@@ -354,13 +392,35 @@ def execute_actions(page, ai_response: str):
 def handle_cookie_banner(page):
     """
     Enhanced function to handle cookie banners with multiple strategies.
+    Prioritizes rejecting cookies when possible, falls back to accepting if needed.
     Returns True if successfully handled, False otherwise.
     """
     print("Attempting to handle cookie banner with multiple strategies...")
     
-    # Strategy 1: Try direct button click by selector
-    cookie_selectors = [
-        "button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll",  # Common Cookiebot selector
+    # # Strategy 1: Try to REJECT cookies first using common button selectors
+    reject_selectors = [
+        "button#CybotCookiebotDialogBodyButtonDecline",  # Common Cookiebot reject button
+        "button:has-text('Reject all')",
+        "button:has-text('Reject')",
+        "button:has-text('Decline')",
+        "button:has-text('No, thanks')",
+        "#reject-all-cookies",
+        ".reject-cookies-button",
+        "[aria-label='Reject all']"
+    ]
+    
+    for selector in reject_selectors:
+        try:
+            if page.is_visible(selector, timeout=1000):
+                print(f"Found reject button with selector: {selector}")
+                page.click(selector)
+                page.wait_for_timeout(1000)
+                return True
+        except Exception as e:
+            print(f"Failed to click reject selector {selector}: {e}")        
+    # Strategy 2: If reject fails, try ACCEPT buttons (fallback)
+    accept_selectors = [
+        "button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll",
         "#cookie-accept-all",
         ".cookie-accept-all",
         ".accept-cookies-button",
@@ -371,30 +431,48 @@ def handle_cookie_banner(page):
         "button:has-text('Allow all')"
     ]
     
-    for selector in cookie_selectors:
+    for selector in accept_selectors:
         try:
             if page.is_visible(selector, timeout=1000):
-                print(f"Found cookie button with selector: {selector}")
+                print(f"Found accept button with selector: {selector}")
                 page.click(selector)
                 page.wait_for_timeout(1000)
                 return True
         except Exception as e:
-            print(f"Failed to click cookie selector {selector}: {e}")
+            print(f"Failed to click accept selector {selector}: {e}")
     
-    # Strategy 2: Try iframe handling (many cookie banners are in iframes)
+    # Strategy 3: Try iframe handling (many cookie banners are in iframes)
     try:
         frames = page.frames
         for frame in frames:
             if "cookie" in frame.url.lower() or "consent" in frame.url.lower():
                 print(f"Found cookie iframe: {frame.url}")
-                frame_selectors = [
+                
+                # Try reject first in the iframe
+                frame_reject_selectors = [
+                    "button:has-text('Reject all')",
+                    "button:has-text('Reject')",
+                    "#reject-button"
+                ]
+                
+                for selector in frame_reject_selectors:
+                    try:
+                        if frame.is_visible(selector, timeout=1000):
+                            frame.click(selector)
+                            page.wait_for_timeout(1000)
+                            return True
+                    except:
+                        continue
+                
+                # Then try accept buttons in the iframe
+                frame_accept_selectors = [
                     "button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll",
                     "button:has-text('Accept all')",
                     "button:has-text('Allow all')",
                     ".accept-all"
                 ]
                 
-                for selector in frame_selectors:
+                for selector in frame_accept_selectors:
                     try:
                         if frame.is_visible(selector, timeout=1000):
                             frame.click(selector)
@@ -405,84 +483,110 @@ def handle_cookie_banner(page):
     except Exception as e:
         print(f"Failed to handle cookie frame: {e}")
     
-    # Strategy 3: JavaScript approach for Cookiebot (which appears in your screenshot)
+    # Strategy 4: JavaScript approach - first reject, then accept as fallback
     try:
-        # This is specifically for Cookiebot which is shown in your screenshot
-        cookiebot_js = """
-        if (typeof CybotCookiebotDialog !== 'undefined') {
-            CybotCookiebotDialog.submitConsent(true, 'https://' + window.location.host + window.location.pathname, false);
-            return true;
-        } else if (document.querySelector('#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')) {
-            document.querySelector('#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll').click();
-            return true;
-        } else if (document.querySelector('button[contains(text(),"Allow all")]')) {
-            document.querySelector('button[contains(text(),"Allow all")]').click();
-            return true;
-        }
-        return false;
-        """
-        result = page.evaluate(cookiebot_js)
-        if result:
-            print("Successfully handled Cookiebot dialog via JavaScript")
-            page.wait_for_timeout(1000)
-            return True
-    except Exception as e:
-        print(f"JavaScript cookie handling failed: {e}")
-    
-    # Strategy 4: General JavaScript approach for any visible button with accept text
-    try:
-        general_cookie_js = """
-        function findAndClickButton(searchText) {
+        # First try to find and click reject buttons via JavaScript
+        reject_js = """
+        function findAndClickButton(searchTexts) {
             // Get all buttons
             const buttons = Array.from(document.querySelectorAll('button, a.button, input[type="button"], div[role="button"]'));
             
             // Check each button for text match
             for (const button of buttons) {
                 const buttonText = button.textContent || button.value || '';
-                if (buttonText.toLowerCase().includes(searchText.toLowerCase()) && 
-                    button.offsetParent !== null) {
-                    button.click();
-                    return true;
+                for (const searchText of searchTexts) {
+                    if (buttonText.toLowerCase().includes(searchText.toLowerCase()) && 
+                        button.offsetParent !== null) {
+                        button.click();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        
+        // Try different reject button texts
+        return findAndClickButton(['reject all', 'reject', 'decline', 'no thanks']);
+        """
+        
+        result = page.evaluate(reject_js)
+        if result:
+            print("Successfully clicked reject button via JavaScript")
+            page.wait_for_timeout(1000)
+            return True
+            
+        # If reject fails, try accept buttons
+        accept_js = """
+        function findAndClickButton(searchTexts) {
+            // Get all buttons
+            const buttons = Array.from(document.querySelectorAll('button, a.button, input[type="button"], div[role="button"]'));
+            
+            // Check each button for text match
+            for (const button of buttons) {
+                const buttonText = button.textContent || button.value || '';
+                for (const searchText of searchTexts) {
+                    if (buttonText.toLowerCase().includes(searchText.toLowerCase()) && 
+                        button.offsetParent !== null) {
+                        button.click();
+                        return true;
+                    }
                 }
             }
             return false;
         }
         
         // Try different common accept button texts
-        return findAndClickButton('allow all') || 
-               findAndClickButton('accept all') || 
-               findAndClickButton('accept cookies') || 
-               findAndClickButton('agree') || 
-               findAndClickButton('accept');
+        return findAndClickButton(['allow all', 'accept all', 'accept cookies', 'agree', 'accept']);
         """
-        result = page.evaluate(general_cookie_js)
+        
+        result = page.evaluate(accept_js)
         if result:
-            print("Successfully clicked cookie button via JavaScript")
+            print("Successfully clicked accept button via JavaScript")
             page.wait_for_timeout(1000)
             return True
     except Exception as e:
-        print(f"General JavaScript cookie handling failed: {e}")
+        print(f"JavaScript cookie handling failed: {e}")
     
     # Strategy 5: Click at positions where cookie buttons typically appear
     try:
-        # Common positions for Accept buttons (bottom right quadrant)
+        # Common positions for buttons (percentages of viewport)
         width = page.viewport_size["width"]
         height = page.viewport_size["height"]
         
-        # Common positions (percentages of viewport)
-        positions = [
-            (width * 0.85, height * 0.9),  # Bottom right
-            (width * 0.5, height * 0.9),   # Bottom center
-            (width * 0.85, height * 0.5)   # Middle right
+        # Common positions for Reject buttons (usually on the left side)
+        reject_positions = [
+            (width * 0.25, height * 0.9),  # Bottom left
+            (width * 0.35, height * 0.9)   # Bottom left-center
         ]
         
-        for x, y in positions:
+        for x, y in reject_positions:
             try:
                 page.mouse.click(x, y)
-                print(f"Attempted click at position x={x}, y={y}")
+                print(f"Attempted click at position x={x}, y={y} (reject)")
                 page.wait_for_timeout(1000)
                 
-                # Check if banner is still visible by looking for cookie-related text
+                # Check if banner is still visible
+                ocr_text = " ".join([item.get('text', '').lower() for item in OCRProcessor().process_image(capture_screenshot(page))])
+                if "cookie" not in ocr_text and "consent" not in ocr_text:
+                    print("Banner appears to be gone after position click")
+                    return True
+            except:
+                continue
+        
+        # Common positions for Accept buttons (usually on the right side)
+        accept_positions = [
+            (width * 0.85, height * 0.9),  # Bottom right
+            (width * 0.75, height * 0.9),  # Bottom right-center
+            (width * 0.65, height * 0.9)   # Bottom center-right
+        ]
+        
+        for x, y in accept_positions:
+            try:
+                page.mouse.click(x, y)
+                print(f"Attempted click at position x={x}, y={y} (accept)")
+                page.wait_for_timeout(1000)
+                
+                # Check if banner is still visible
                 ocr_text = " ".join([item.get('text', '').lower() for item in OCRProcessor().process_image(capture_screenshot(page))])
                 if "cookie" not in ocr_text and "consent" not in ocr_text:
                     print("Banner appears to be gone after position click")
@@ -494,3 +598,30 @@ def handle_cookie_banner(page):
     
     print("All cookie banner handling strategies failed")
     return False
+
+def find_natural_search_results(page):
+    """Find natural (non-sponsored) search result links"""
+    try:
+        # Try to identify natural results while avoiding ads
+        natural_selectors = [
+            "div:not([data-text-ad]) a[ping]",
+            ".g:not(.ads-ad) a[href]",
+            "#search a[href]:not([data-jsarwt])",
+            "h3[class*='LC20lb']" # Google's organic result heading class
+        ]
+        
+        for selector in natural_selectors:
+            try:
+                # Get all natural results
+                links = page.query_selector_all(selector)
+                if links and len(links) > 0:
+                    # Return the first natural result
+                    return links[0]
+            except Exception as e:
+                logging.error(f"Error finding results with selector {selector}: {e}")
+                continue
+        
+        return None
+    except Exception as e:
+        logging.error(f"Error finding natural search results: {e}")
+        return None

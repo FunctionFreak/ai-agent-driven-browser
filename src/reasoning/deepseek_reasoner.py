@@ -50,9 +50,11 @@ class DeepSeekReasoner:
    - If you need to visit a specific website, navigate there directly if URL is known
    - Otherwise, use Google search to find relevant pages
    - When using search engines, use specific, well-formed queries related to the task
+   - IMPORTANT: Avoid sponsored links and ads, prioritize organic search results
 
 3. ELEMENT INTERACTION:
-   - For cookie banners or consent prompts, look for "Accept", "I agree", or "Continue"
+   - For cookie banners, PREFER to click "Reject" or "Reject all" buttons when available
+   - Only use "Accept all" as a fallback when rejection is not possible
    - For Google search, specifically use the selector "input[name='q']" for the search box
    - For navigation, find and click on the most relevant links
    - For forms, fill in required fields and submit
