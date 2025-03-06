@@ -15,7 +15,8 @@ from src.handlers.search_handler import SearchHandler
 from src.utils.dom_utils import DOMExplorer
 from src.automation.playwright_controller import execute_dom_action
 from src.tasks.task_manager import Task, Subtask
-from src.feedback.feedback_loop import create_task_from_goal
+from src.automation.playwright_controller import execute_dom_action
+from src.automation.playwright_controller import execute_dom_action
 
 def create_task_from_goal(goal: str) -> Task:
     """

@@ -3,47 +3,9 @@ import re
 import logging
 import random
 import time
-# At the top of the file, add these imports:
 from src.vision.ocr_processor import OCRProcessor
 from src.capture.screen_capture import capture_screenshot
 from src.utils.json_utils import extract_json
-
-def extract_json(response_text: str):
-    """
-    Extract the JSON object from the response text, handling different formats.
-    """
-    # Try to find JSON in code blocks
-    code_block_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response_text)
-    if code_block_match:
-        json_str = code_block_match.group(1)
-        try:
-            return json.loads(json_str)
-        except json.JSONDecodeError as e:
-            logging.error(f"JSON parsing error in code block: {e}")
-            # Try to fix common issues
-            fixed_str = json_str.replace("'", '"').replace("\n", " ")
-            try:
-                return json.loads(fixed_str)
-            except:
-                pass
-    
-    # Try to find JSON between curly braces
-    plain_json_match = re.search(r'({[\s\S]*?})', response_text)
-    if plain_json_match:
-        json_str = plain_json_match.group(1)
-        try:
-            return json.loads(json_str)
-        except json.JSONDecodeError as e:
-            logging.error(f"JSON parsing error in plain text: {e}")
-            # Try to fix common issues
-            fixed_str = json_str.replace("'", '"').replace("\n", " ")
-            try:
-                return json.loads(fixed_str)
-            except:
-                pass
-    
-    logging.error("No valid JSON found in response")
-    return None
 
 def simulate_human_mouse_movement(page):
     """Simulate random mouse movements like a human would make"""

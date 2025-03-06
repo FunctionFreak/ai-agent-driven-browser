@@ -1,1 +1,8 @@
 jsonschema
+easyocr
+ultralytics
+playwright
+groq
+requests
+python-dotenv
+opencv-python

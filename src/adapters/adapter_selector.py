@@ -1,8 +1,4 @@
 # src/adapters/adapter_selector.py
-from src.adapters.adapter_selector import select_adapter
-
-adapter = select_adapter(page)
-search_box_selector = adapter.get_search_box_selector()
 
 def select_adapter(page):
     """
