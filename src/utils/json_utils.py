@@ -31,12 +31,13 @@ RESPONSE_SCHEMA = {
     }
 }
 
-def extract_json(response_text: str):
+def extract_json(response_text: str, context=None):
     """
     Extract and parse JSON from AI response text with multiple fallback strategies.
     
     Args:
         response_text: The text response from the AI that might contain JSON
+        context: Optional execution context for more intelligent fallbacks
         
     Returns:
         dict: Parsed JSON object or fallback command if parsing fails
@@ -53,11 +54,8 @@ def extract_json(response_text: str):
     
     # If all parsing fails, return a fallback command
     logging.error("All JSON parsing methods failed")
-    return generate_fallback_command()
-    
-    # If all parsing fails, return a fallback command
-    logging.error("All JSON parsing methods failed")
-    return generate_fallback_command()
+    logging.error("Trying alternative approach from self-reasoning")
+    return generate_fallback_command(context)
 
 def try_parse_code_block(text):
     """Try to extract and parse JSON from a code block"""
@@ -173,11 +171,31 @@ def fix_json_structure(json_obj):
     
     return fixed
 
-def generate_fallback_command():
-    """Generate a fallback command when JSON parsing fails"""
+def generate_fallback_command(context=None):
+    """
+    Generate a fallback command when JSON parsing fails.
+    Attempts to return to previous successful state if context is available.
+    
+    Args:
+        context: Optional execution context containing history
+        
+    Returns:
+        dict: Fallback command object
+    """
+    # If we have context, try to return to previous successful state
+    if context and context.get("previous_successful_url"):
+        return {
+            "analysis": "JSON parsing failed - returning to previous successful state",
+            "state": "Error recovery - rolling back",
+            "commands": [
+                {"action": "navigate", "url": context["previous_successful_url"]}
+            ],
+            "complete": False
+        }
+    # Otherwise, go to Google as a last resort
     return {
         "analysis": "Failed to parse valid JSON from AI response",
-        "state": "Error recovery",
+        "state": "Error recovery - restarting from search",
         "commands": [
             {"action": "navigate", "url": "https://www.google.com"}
         ],
