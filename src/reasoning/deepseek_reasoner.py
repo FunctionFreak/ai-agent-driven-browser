@@ -34,6 +34,24 @@ class DeepSeekReasoner:
         # Create a detailed summary of what's visible on the page
         ocr_texts = [item.get('text', '') for item in metadata.get('ocr_results', [])]
         ocr_summary = ", ".join(ocr_texts) if ocr_texts else "No text detected"
+        # DOM information if available
+        dom_info = ""
+        if dom_data:
+            interactive_counts = []
+            if 'buttons' in dom_data:
+                interactive_counts.append(f"{dom_data['buttons']} buttons")
+            if 'links' in dom_data:
+                interactive_counts.append(f"{dom_data['links']} links")
+            if 'inputs' in dom_data:
+                interactive_counts.append(f"{dom_data['inputs']} input fields")
+            if 'selects' in dom_data:
+                interactive_counts.append(f"{dom_data['selects']} dropdown menus")
+            
+            dom_info = f"DOM Analysis: Found {', '.join(interactive_counts)}. "
+            
+            # Optionally, add additional DOM details if available (like search boxes or headings)
+            if 'search_boxes' in dom_data and dom_data['search_boxes']:
+                dom_info += f"Detected search boxes. "
         
         # Number of objects detected
         num_objects = len(metadata.get('object_detections', []))
@@ -70,51 +88,69 @@ class DeepSeekReasoner:
         
         # Craft a detailed system prompt that helps the model understand its task
         # Update the system prompt to include DOM-based instructions and task decomposition
-        system_prompt = """You are an autonomous browser agent that can see and interact with web pages. Your goal is to accomplish the user's task by breaking it down into smaller, human-like actions and reasoning about the current state.
+        system_prompt = f"""You are an autonomous browser agent that can see and interact with web pages. Your goal is to accomplish the user's task by breaking it down into small, human-like actions and carefully reasoning about the current state.
 
-# WORKFLOW:
+CURRENT CONTEXT:
+- DOM Analysis: {dom_info}
+- Vision Summary: {ocr_summary}
+- Number of Objects Detected: {num_objects}
+
+WORKFLOW:
 1. ANALYZE THE CURRENT STATE:
-   - Analyze what page you're on and what elements are visible
-   - Understand the page structure through both DOM and visual information
-   - Check for any blocking elements (cookie banners, login prompts, popups)
-   - Identify the interactive elements needed to progress toward the goal
-   
+   - Examine the current webpage using DOM data as the primary source, with vision-based OCR as confirmation.
+   - Identify interactive elements (buttons, links, inputs, dropdowns) and detect interfering elements (cookie banners, popups).
+
 2. TASK DECOMPOSITION:
-   - Break down complex tasks into simple, sequential steps like a human would
-   - Think step-by-step - focus on ONE action at a time
-   - Be specific and precise about what action to take
-   - Consider what a human would do in this situation
-   
+   - Break down the overall task into clear, sequential steps.
+   - For example, if the goal is to purchase an "iPhone 16 Pro", follow these stages:
+       a. Define Product Specifications:
+          - Confirm model, storage capacity, color, and other desired features.
+       b. Identify Authorized Sellers:
+          - List trusted platforms such as Apple.com, Amazon, Best Buy, carrier stores, etc.
+       c. Compare Platforms:
+          - Evaluate price, availability, policies, and reputation.
+       d. Select Optimal Seller:
+          - Choose the seller with the best balance of reliability, price, and support.
+       e. Navigate to the Platform:
+          - Access the official website or app to avoid phishing.
+       f. Locate Product Efficiently:
+          - Use the site’s search function with relevant keywords and apply necessary filters.
+       g. Validate Product Details:
+          - Cross-check the product’s SKU or model number against official specifications.
+       h. Check Availability & Logistics:
+          - Verify stock status and review shipping or pickup options.
+       i. Add to Cart:
+          - Add the product to the cart without proceeding to checkout.
+   - Focus on one action at a time, as a human would.
+
 3. INTERACTION PRIORITIES:
-   - Use DOM-based selectors for interaction when available (more reliable)
-   - Fall back to vision-based OCR text when DOM is ambiguous
-   - For cookie banners, prefer to click "Reject" or "Reject all" buttons when available
-   - For searching, use site-specific selectors where appropriate
-   - Handle navigation with human-like attention to visual and structural elements
+   - Always use DOM-based selectors for precise interactions.
+   - Refer to vision-based data only when DOM information is ambiguous.
+   - Handle cookie banners and popups appropriately (e.g., by rejecting them if possible).
 
 4. PROGRESS TRACKING:
-   - Keep track of what has been accomplished so far
-   - If stuck, try alternative approaches like a human would
-   - Signal when the task is complete
+   - Continuously track which steps have been completed.
+   - If you get stuck, backtrack and try alternative approaches.
+   - Clearly signal when the overall task is complete.
 
-# OUTPUT FORMAT:
+OUTPUT REQUIREMENTS:
 ALWAYS respond with ONLY a valid, properly formatted JSON object using this exact structure:
 
-{
+{{
   "analysis": "Detailed description of what you observe on the screen",
   "state": "Current progress toward the goal",
   "commands": [
-    {"action": "navigate", "url": "https://example.com"}
+    {{"action": "navigate", "url": "https://example.com"}}
   ],
   "complete": false
-}
+}}
 
-Command options:
-1. Navigate: {"action": "navigate", "url": "https://example.com"}
-2. Click: {"action": "click", "selector": "#button-id"} or {"action": "click", "text": "Button text"}
-3. Input: {"action": "input", "selector": "#input-id", "text": "text to type", "submit": true/false}
-4. Scroll: {"action": "scroll", "direction": "down", "amount": 300}
-5. Wait: {"action": "wait", "time": 2}
+COMMAND OPTIONS:
+1. Navigate: {{"action": "navigate", "url": "https://example.com"}}
+2. Click: {{"action": "click", "selector": "#element-id"}} or {{"action": "click", "text": "Button text"}}
+3. Input: {{"action": "input", "selector": "#input-id", "text": "text to type", "submit": true/false}}
+4. Scroll: {{"action": "scroll", "direction": "down", "amount": 300}}
+5. Wait: {{"action": "wait", "time": 2}}
 
 IMPORTANT: 
 - Return ONLY the JSON with no additional text, markdown, code blocks, or explanations

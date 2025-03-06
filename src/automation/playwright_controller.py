@@ -108,6 +108,47 @@ def launch_browser_with_profile():
     except Exception as e:
         print(f"Error launching browser: {e}")
         raise e
+
+def execute_dom_action(page, command):
+    """
+    Attempt to execute a command using DOM-based interaction first.
+    Fallback to other methods if necessary.
+    
+    Args:
+        page: The Playwright page object.
+        command: A dict containing the action and any required parameters.
+        
+    Returns:
+        bool: True if the action was successful, False otherwise.
+    """
+    from src.utils.dom_utils import DOMExplorer
+
+    action = command.get("action")
+    success = False
+
+    if action == "click":
+        # Try using a selector first, then text if selector isn't provided.
+        if "selector" in command:
+            success = DOMExplorer.find_and_interact(page, "button", command["selector"], action="click")
+        elif "text" in command:
+            success = DOMExplorer.find_and_interact(page, "button", command["text"], action="click")
+    
+    elif action == "input":
+        if "selector" in command and "text" in command:
+            success = DOMExplorer.find_and_interact(page, "input", command["selector"], action="fill", value=command["text"])
+    
+    elif action == "navigate":
+        # Direct navigation using Playwright's goto method.
+        try:
+            page.goto(command.get("url"), timeout=60000)
+            success = True
+        except Exception as e:
+            success = False
+
+    # Add further actions (scroll, wait, etc.) as needed.
+
+    return success
+
 # Example usage:
 #if __name__ == "__main__":
     browser = launch_browser_with_profile()

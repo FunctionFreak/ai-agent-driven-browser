@@ -13,6 +13,39 @@ from src.utils.json_utils import extract_json
 from src.automation.playwright_controller import apply_stealth_mode
 from src.handlers.search_handler import SearchHandler
 from src.utils.dom_utils import DOMExplorer
+from src.automation.playwright_controller import execute_dom_action
+from src.tasks.task_manager import Task, Subtask
+from src.feedback.feedback_loop import create_task_from_goal
+
+def create_task_from_goal(goal: str) -> Task:
+    """
+    Create a Task object from the user's high-level goal.
+    This is a simplistic example; you can expand it with more logic.
+    """
+    task = Task(name=goal)
+
+    # Example logic: if goal mentions 'iPhone'
+    if "iphone" in goal.lower():
+        task.add_subtask(Subtask("Define desired iPhone model/specs"))
+        task.add_subtask(Subtask("Identify authorized sellers (Apple, Amazon, etc.)"))
+        task.add_subtask(Subtask("Compare prices, availability, and policies"))
+        task.add_subtask(Subtask("Select optimal seller and navigate to site"))
+        task.add_subtask(Subtask("Locate iPhone and validate product details"))
+        task.add_subtask(Subtask("Add iPhone to cart without checkout"))
+    # Example logic: if goal mentions 'pizza recipe'
+    elif "pizza" in goal.lower() and "recipe" in goal.lower():
+        task.add_subtask(Subtask("Identify reliable recipe sources (Allrecipes, Food Network, etc.)"))
+        task.add_subtask(Subtask("Navigate to chosen site"))
+        task.add_subtask(Subtask("Locate desired pizza recipe"))
+        task.add_subtask(Subtask("Review ingredients and instructions"))
+
+    else:
+        # Generic fallback if goal isn't recognized
+        task.add_subtask(Subtask("Analyze the goal and decide on a search strategy"))
+        task.add_subtask(Subtask("Navigate to a search engine (Google)"))
+        task.add_subtask(Subtask("Perform a relevant search for the goal"))
+
+    return task
 
 def is_captcha_page(ocr_results):
     """Check if current page is showing a CAPTCHA or security challenge"""
@@ -82,6 +115,9 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
         "captcha_count": 0       # To track CAPTCHA encounters
     }
     
+    task = create_task_from_goal(initial_goal)
+    context["task"] = task
+    
     for iteration in range(1, max_iterations + 1):
         context["iteration"] = iteration
         print(f"\n--- Feedback Loop Iteration {iteration}/{max_iterations} ---")
@@ -111,19 +147,37 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
             print(f"Detected text on page: {', '.join(texts)}...")
         else:
             print("No text detected on page")
-         # Analyze page with DOM explorer
-        print("Analyzing page DOM structure...")
+            # Analyze page with DOM explorer
+            print("Analyzing page DOM structure...")
+            interactive_elements = DOMExplorer.find_interactive_elements(page)
+            print(f"Found {interactive_elements.get('buttons', 0)} buttons, {interactive_elements.get('links', 0)} links, {interactive_elements.get('inputs', 0)} input fields")
+
+        # ---- Subtask Auto-Check Start ----
+        current_subtask = context["task"].get_current_subtask()
+        if current_subtask:
+            if current_subtask.check_if_complete(page, context):
+                current_subtask.mark_complete()
+                print(f"Subtask '{current_subtask.description}' is already complete (auto-detected).")
+                new_subtask = context["task"].get_current_subtask()
+                if new_subtask:
+                    print(f"Proceeding to next subtask: {new_subtask.description}")
+                else:
+                    print("All subtasks are complete. Exiting loop.")
+                    break
+        # ---- Subtask Auto-Check End ----
+
+            # Check if there's a cookie consent banner using DOM
+            cookie_banner_handled = DOMExplorer.find_cookie_consent(page)
+            if cookie_banner_handled:
+                context["actions_taken"].append("Handled cookie consent banner using DOM exploration")
+                print("Cookie banner handled successfully via DOM")
+                # Optionally, take a new screenshot and continue to next iteration if needed
+                screenshot_path = capture_screenshot(page)
+                continue
+        # Always analyze the page DOM for context
         interactive_elements = DOMExplorer.find_interactive_elements(page)
-        print(f"Found {interactive_elements.get('buttons', 0)} buttons, {interactive_elements.get('links', 0)} links, {interactive_elements.get('inputs', 0)} input fields")
-        
-        # Check if there's a cookie consent banner using DOM
-        cookie_banner_handled = DOMExplorer.find_cookie_consent(page)
-        if cookie_banner_handled:
-            context["actions_taken"].append("Handled cookie consent banner using DOM exploration")
-            print("Cookie banner handled successfully via DOM")
-            # Take a new screenshot and continue to next iteration
-            screenshot_path = capture_screenshot(page)
-            continue
+        print(f"DOM context: {interactive_elements}")
+
         
         # Generate metadata
         metadata = metadata_gen.generate_metadata(object_detections, ocr_results)
@@ -144,7 +198,10 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
         
         # Current URL info
         current_url = page.url
-        context_message = f"GOAL: {initial_goal}\nCURRENT URL: {current_url}\nCURRENT STATE: {context['current_state']}\nITERATION: {iteration}/{max_iterations}"
+        # Retrieve current subtask from the task object
+        current_subtask = context["task"].get_current_subtask()
+        subtask_info = current_subtask.description if current_subtask else "No subtask defined"
+        context_message = f"GOAL: {initial_goal}\nCURRENT SUBTASK: {subtask_info}\nCURRENT URL: {current_url}\nCURRENT STATE: {context['current_state']}\nITERATION: {iteration}/{max_iterations}"
         
         # Check for CAPTCHA
         if is_captcha_page(ocr_results):
@@ -283,7 +340,7 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
             
         # Get AI decision with context
         try:
-            ai_response = reasoner.get_response(context_message, metadata)
+            ai_response = reasoner.get_response(context_message, metadata, dom_data=interactive_elements)
             print("AI Response:", ai_response)
         except Exception as e:
             print(f"AI API error: {e}")
@@ -332,25 +389,57 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
             if response_json and "commands" in response_json:
                 commands = response_json.get("commands", [])
                 
-                # Check for search-related commands
+                # 1) Handle specialized search-related commands first
                 for cmd in commands:
-                    # If this is a search-related input command
-                    if cmd.get("action") == "input" and cmd.get("text") and (
-                        "search" in cmd.get("selector", "").lower() or 
-                        cmd.get("selector", "") == "input[name='q']" or
-                        "search" in cmd.get("text", "").lower()
-                    ):
-                        # Try the flexible search handler
-                        print(f"Detected search command, using flexible search handler")
-                        search_term = cmd.get("text", "")
-                        search_success = search_handler.perform_search(page, search_term, ocr_results)
-                        
-                        if search_success:
-                            context["actions_taken"].append(f"Searched for '{search_term}' using flexible search handler")
-                            print(f"Successfully searched for: {search_term}")
-                            # Skip to next iteration
-                            continue
-            actions = execute_actions(page, ai_response)
+                    # Example: if it's an input action containing a search term
+                    if cmd.get("action") == "input" and cmd.get("text"):
+                        # If the text or selector indicates a search command
+                        if "search" in cmd.get("text", "").lower() or "q" in cmd.get("selector", "").lower():
+                            print(f"Detected search command, using flexible search handler")
+                            search_term = cmd.get("text", "")
+                            search_success = search_handler.perform_search(page, search_term, ocr_results)
+                            if search_success:
+                                context["actions_taken"].append(f"Searched for '{search_term}' using flexible search handler")
+                                print(f"Successfully searched for: {search_term}")
+                                # Since we've handled this search command, we can continue
+                                # to the next command in the list (no DOM fallback needed here)
+                                continue
+
+                # 2) Attempt DOM-based action execution for click/input/navigate
+                dom_executed = False
+                for cmd in commands:
+                    if cmd.get("action") in ["click", "input", "navigate"]:
+                        success = execute_dom_action(page, cmd)
+                        if success:
+                            logging.info("Action executed successfully via DOM-based method for command: %s", cmd)
+                            dom_executed = True
+                        else:
+                            logging.error("DOM-based action execution failed for command: %s", cmd)
+
+                # If no DOM-based action succeeded, log a warning
+                if not dom_executed:
+                    logging.warning("No DOM-based actions succeeded. Falling back to standard action execution.")
+
+                try:
+                    actions = execute_actions(page, ai_response)
+                except Exception as fallback_error:
+                    logging.error("Fallback action execution failed: %s", fallback_error)
+                    # Optionally, trigger a self-reasoning fallback or reset the page
+                    try:
+                        self_prompt = f"""
+                        I'm stuck while executing actions for the goal: {initial_goal}
+                        Current URL: {page.url}
+                        Please suggest an alternative approach.
+                        """
+                        alternative_response = reasoner.get_response(self_prompt, metadata, dom_data=interactive_elements)
+                        logging.info("Self-reasoning fallback response: %s", alternative_response)
+                        actions = execute_actions(page, alternative_response)
+                    except Exception as e:
+                        logging.critical("Self-reasoning fallback also failed: %s", e)
+                        actions = []  # Proceed with no action or consider resetting the context
+
+                # 3) Fallback: call your existing action executor
+                actions = execute_actions(page, ai_response)
             
             # Check if we're stuck in a loop
             if actions == context["previous_actions"]:
@@ -462,6 +551,22 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
             if actions:
                 context["actions_taken"].extend(actions)
                 print(f"Actions performed: {', '.join(actions)}")
+            
+            current_subtask = context["task"].get_current_subtask()
+            if current_subtask:
+                if response_json and "state" in response_json and "done" in response_json["state"].lower():
+                    context["task"].mark_subtask_complete()
+                    print(f"Marked subtask '{current_subtask.description}' as complete.")
+
+                    new_subtask = context["task"].get_current_subtask()
+                    if new_subtask:
+                        print(f"Next subtask: {new_subtask.description}")
+                    else:
+                        print("No further subtasks left.")
+
+            if context["task"].is_complete():
+                print("\n=== ALL SUBTASKS COMPLETED! ===")
+                break
             
             # Check if task is complete
             response_json = extract_json(ai_response)
