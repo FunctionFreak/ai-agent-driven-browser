@@ -46,42 +46,54 @@ class DeepSeekReasoner:
    - Check if there are any blocking elements (cookie banners, login prompts, popups)
    - Identify the interactive elements needed to progress toward the goal
    
-2. NAVIGATION PATH:
+2. TASK DECOMPOSITION:
+   - Break down complex tasks into simple, sequential steps
+   - Only plan one step at a time based on the current state
+   - Be specific and precise about what action to take
+   
+3. NAVIGATION AND INTERACTION:
    - If you need to visit a specific website, navigate there directly if URL is known
    - Otherwise, use Google search to find relevant pages
-   - When using search engines, use specific, well-formed queries related to the task
-   - IMPORTANT: Avoid sponsored links and ads, prioritize organic search results
-
-3. ELEMENT INTERACTION:
-   - For cookie banners, PREFER to click "Reject" or "Reject all" buttons when available
+   - For cookie banners, prefer to click "Reject" or "Reject all" buttons when available
    - Only use "Accept all" as a fallback when rejection is not possible
-   - For Amazon, use selector "input[id='twotabsearchtextbox']" for the search box
+   - For searching, use site-specific selectors (e.g., for Amazon: input[id='twotabsearchtextbox'])
    - For Google search, use selector "textarea[name='q']" instead of "input[name='q']"
-   - For navigation, find and click on the most relevant links
-   - For forms, fill in required fields and submit
+   - Prioritize organic search results over sponsored links and ads
 
 4. PROGRESS TRACKING:
-   - Keep track of what has been done and what remains
-   - Handle any unexpected situations that arise
+   - Keep track of what has been accomplished so far
    - Signal when the task is complete
+   - Be honest about obstacles and suggest alternatives
 
 # OUTPUT FORMAT:
-ALWAYS respond with a valid JSON object in the following format - this is critically important:
+ALWAYS respond with ONLY a valid, properly formatted JSON object using this exact structure:
+
 {
   "analysis": "Detailed description of what you observe on the screen",
   "state": "Current progress toward the goal",
   "commands": [
-    {"action": "navigate", "url": "https://example.com"},
-    {"action": "click", "text": "Accept all"},
-    {"action": "input", "selector": "input[name='q']", "text": "query", "submit": true},
-    {"action": "scroll", "direction": "down", "amount": 300}
+    {"action": "navigate", "url": "https://example.com"}
   ],
   "complete": false
 }
 
-Make sure your response contains ONLY this JSON object with no additional text, markdown, or explanation before or after.
+Command options:
+1. Navigate: {"action": "navigate", "url": "https://example.com"}
+2. Click: {"action": "click", "selector": "#button-id"} or {"action": "click", "text": "Button text"}
+3. Input: {"action": "input", "selector": "#input-id", "text": "text to type", "submit": true/false}
+4. Scroll: {"action": "scroll", "direction": "down", "amount": 300}
+5. Wait: {"action": "wait", "time": 2}
 
-Make decisions based on the OCR text you can see on the page. Focus on moving towards the goal step by step.
+IMPORTANT: 
+- Return ONLY the JSON with no additional text, markdown, code blocks, or explanations
+- Make sure all JSON keys and string values are in double quotes
+- Ensure commas are correctly placed between JSON properties and array items
+- DO NOT include trailing commas at the end of arrays or objects
+- Always include the "analysis", "state", "commands", and "complete" fields
+- Only include exactly ONE command in the "commands" array
+- Keep command simple and focused on a single action
+
+Focus on making progress toward the goal step by step.
 """
 
         # Construct a detailed prompt with context and visuals

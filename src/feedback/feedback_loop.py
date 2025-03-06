@@ -12,6 +12,7 @@ from src.automation.action_executor import execute_actions, simulate_human_mouse
 from src.utils.json_utils import extract_json
 from src.automation.playwright_controller import apply_stealth_mode
 from src.handlers.search_handler import SearchHandler
+from src.utils.dom_utils import DOMExplorer
 
 def is_captcha_page(ocr_results):
     """Check if current page is showing a CAPTCHA or security challenge"""
@@ -54,7 +55,7 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
     """
     # Initialize handlers
     search_handler = SearchHandler()  # 
-
+    dom_explorer = DOMExplorer()  
     # Apply stealth mode to the page
     apply_stealth_mode(page)
     
@@ -110,6 +111,19 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
             print(f"Detected text on page: {', '.join(texts)}...")
         else:
             print("No text detected on page")
+         # Analyze page with DOM explorer
+        print("Analyzing page DOM structure...")
+        interactive_elements = DOMExplorer.find_interactive_elements(page)
+        print(f"Found {interactive_elements.get('buttons', 0)} buttons, {interactive_elements.get('links', 0)} links, {interactive_elements.get('inputs', 0)} input fields")
+        
+        # Check if there's a cookie consent banner using DOM
+        cookie_banner_handled = DOMExplorer.find_cookie_consent(page)
+        if cookie_banner_handled:
+            context["actions_taken"].append("Handled cookie consent banner using DOM exploration")
+            print("Cookie banner handled successfully via DOM")
+            # Take a new screenshot and continue to next iteration
+            screenshot_path = capture_screenshot(page)
+            continue
         
         # Generate metadata
         metadata = metadata_gen.generate_metadata(object_detections, ocr_results)
