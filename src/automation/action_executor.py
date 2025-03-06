@@ -6,6 +6,7 @@ import time
 # At the top of the file, add these imports:
 from src.vision.ocr_processor import OCRProcessor
 from src.capture.screen_capture import capture_screenshot
+from src.utils.json_utils import extract_json
 
 def extract_json(response_text: str):
     """
@@ -273,50 +274,53 @@ def execute_actions(page, ai_response: str):
                 except Exception as e:
                     logging.error(f"Text click failed: {e}")
         
-        elif action == "click":
+        elif action == "input":
             selector = cmd.get("selector")
-            text = cmd.get("text")
+            text = cmd.get("text", "")
+            submit = cmd.get("submit", False)
             
-            # Special handling for cookie banners and consent prompts
-            if text and any(keyword in text.lower() for keyword in ["accept", "allow", "cookie", "consent"]):
-                cookie_handled = handle_cookie_banner(page)
-                if cookie_handled:
-                    actions_performed.append(f"Handled cookie consent banner")
-                    continue
-            
-            # Special handling for search result links
-            elif "search?" in page.url and (text and ("recipe" in text.lower() or not text.startswith("http"))):
+            # Special handling for Amazon search
+            if "amazon" in page.url and (selector == "input[name='q']" or "search" in selector.lower()):
+                # Use the correct Amazon search box selector
+                amazon_search = "input[id='twotabsearchtextbox']"
                 try:
-                    # Try to find and click on a natural (non-sponsored) result
-                    print("Looking for natural search results...")
-                    natural_result = find_natural_search_results(page)
-                    
-                    if natural_result:
-                        # Get position for mouse movement
-                        element_position = natural_result.bounding_box()
-                        if element_position:
-                            # Move mouse naturally to the element center
-                            center_x = element_position["x"] + element_position["width"] / 2
-                            center_y = element_position["y"] + element_position["height"] / 2
-                            move_mouse_naturally(page, center_x, center_y)
+                    if page.is_visible(amazon_search, timeout=2000):
+                        # Move mouse naturally to the element
+                        element_position = page.evaluate(f"""() => {{
+                            const element = document.querySelector('{amazon_search}');
+                            if (!element) return null;
+                            const rect = element.getBoundingClientRect();
+                            return {{ x: rect.x + rect.width/2, y: rect.y + rect.height/2 }};
+                        }}""")
                         
-                        # Click the natural result
-                        natural_result.click()
-                        actions_performed.append(f"Clicked natural search result")
-                        page.wait_for_timeout(2000)  # Wait for the page to load
+                        if element_position:
+                            move_mouse_naturally(page, element_position['x'], element_position['y'])
+                        
+                        page.click(amazon_search)
+                        page.fill(amazon_search, "")
+                        
+                        # Type with human-like delays
+                        for char in text:
+                            page.type(amazon_search, char, delay=random.randint(50, 200))
+                            time.sleep(random.uniform(0.01, 0.05))
+                        
+                        actions_performed.append(f"Typed '{text}' into Amazon search box")
+                        
+                        if submit:
+                            # Use Amazon's search submit button
+                            submit_button = "input[id='nav-search-submit-button']"
+                            if page.is_visible(submit_button, timeout=1000):
+                                page.click(submit_button)
+                            else:
+                                # Or press Enter if button not found
+                                page.press(amazon_search, "Enter")
+                            actions_performed.append("Submitted Amazon search")
+                            page.wait_for_timeout(3000)
+                        return actions_performed
                     else:
-                        # Fallback to regular clicking if no natural results found
-                        if text:
-                            for strategy in text_strategies:
-                                try:
-                                    if page.is_visible(strategy, timeout=1000):
-                                        page.click(strategy)
-                                        actions_performed.append(f"Clicked element with text: {text}")
-                                        break
-                                except:
-                                    continue
+                        logging.error(f"Amazon search box not visible")
                 except Exception as e:
-                    logging.error(f"Error clicking natural search result: {e}")
+                    logging.error(f"Amazon search failed: {e}")
             
             # Regular input handling with human-like typing
             elif selector:

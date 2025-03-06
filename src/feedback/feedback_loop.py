@@ -9,8 +9,9 @@ from src.vision.ocr_processor import OCRProcessor
 from src.metadata.metadata_generator import MetadataGenerator
 from src.reasoning.deepseek_reasoner import DeepSeekReasoner
 from src.automation.action_executor import execute_actions, simulate_human_mouse_movement
-from src.automation.action_executor import extract_json
+from src.utils.json_utils import extract_json
 from src.automation.playwright_controller import apply_stealth_mode
+from src.handlers.search_handler import SearchHandler
 
 def is_captcha_page(ocr_results):
     """Check if current page is showing a CAPTCHA or security challenge"""
@@ -51,6 +52,9 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
     """
     Enhanced feedback loop with progress tracking and human-like behavior
     """
+    # Initialize handlers
+    search_handler = SearchHandler()  # 
+
     # Apply stealth mode to the page
     apply_stealth_mode(page)
     
@@ -159,7 +163,7 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                     context["actions_taken"].append("Reset page due to CAPTCHA")
                 
                 # Add longer delay to appear more human-like
-                wait_time = random.uniform(3.0, 7.0)
+                wait_time = random.uniform(1.0, 3.0)
                 print(f"Waiting {wait_time:.1f} seconds...")
                 time.sleep(wait_time)
                 
@@ -308,8 +312,30 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                 }
                 """
         
-        # Execute actions
+        # Execute actions        
         try:
+            response_json = extract_json(ai_response)
+            if response_json and "commands" in response_json:
+                commands = response_json.get("commands", [])
+                
+                # Check for search-related commands
+                for cmd in commands:
+                    # If this is a search-related input command
+                    if cmd.get("action") == "input" and cmd.get("text") and (
+                        "search" in cmd.get("selector", "").lower() or 
+                        cmd.get("selector", "") == "input[name='q']" or
+                        "search" in cmd.get("text", "").lower()
+                    ):
+                        # Try the flexible search handler
+                        print(f"Detected search command, using flexible search handler")
+                        search_term = cmd.get("text", "")
+                        search_success = search_handler.perform_search(page, search_term, ocr_results)
+                        
+                        if search_success:
+                            context["actions_taken"].append(f"Searched for '{search_term}' using flexible search handler")
+                            print(f"Successfully searched for: {search_term}")
+                            # Skip to next iteration
+                            continue
             actions = execute_actions(page, ai_response)
             
             # Check if we're stuck in a loop
@@ -321,6 +347,34 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
             # If we're stuck for 3 iterations, try a different approach
             if context["stuck_counter"] >= 3:
                 print("Detected loop, trying alternative approach...")
+                
+                # Generate a self-prompt to analyze the situation
+                self_prompt = f"""
+                I'm stuck in a loop trying to accomplish: {initial_goal}
+                Current page: {current_url}
+                Current state: {context['current_state']}
+                Last actions taken: {', '.join(context['actions_taken'][-3:])}
+                OCR detected text: {', '.join([r['text'] for r in ocr_results[:10]])}
+                
+                What's probably going wrong and what alternative approach should I try?
+                """
+                
+                try:
+                    # Ask the AI for an alternative approach
+                    alternative_response = reasoner.get_response(self_prompt, metadata)
+                    print("Self-reasoning response:", alternative_response)
+                    
+                    # Extract the alternative approach from the response
+                    alternative_json = extract_json(alternative_response)
+                    if alternative_json and "commands" in alternative_json:
+                        print("Trying alternative approach from self-reasoning")
+                        alt_actions = execute_actions(page, alternative_response)
+                        if alt_actions:
+                            context["actions_taken"].extend(alt_actions)
+                            context["stuck_counter"] = 0
+                            continue
+                except Exception as e:
+                    print(f"Self-reasoning attempt failed: {e}")
                 
                 # If we're stuck on Google with a cookie banner
                 if "google.com" in current_url:
@@ -424,6 +478,24 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
     
     return context
 
+def extract_search_term_from_goal(goal):
+    """Extract likely search term from user goal"""
+    # Common patterns for products
+    import re
+    
+    # Try to find product names like "iPhone 16 Pro"
+    product_match = re.search(r'(?:find|search for|looking for|buy|purchase|get)?\s*([a-zA-Z0-9]+(?: [a-zA-Z0-9]+){1,5})\b', goal)
+    if product_match:
+        return product_match.group(1)
+    
+    # Try to find recipe names
+    if "recipe" in goal.lower():
+        recipe_match = re.search(r'([a-zA-Z]+(?: [a-zA-Z]+){0,3})\s+recipe', goal)
+        if recipe_match:
+            return f"{recipe_match.group(1)} recipe"
+    
+    # Default to the whole goal if nothing specific found
+    return goal
 
 # Example usage if run directly
 if __name__ == "__main__":

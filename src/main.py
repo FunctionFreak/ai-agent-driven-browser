@@ -6,6 +6,8 @@ import shutil
 import random
 import time
 from dotenv import load_dotenv
+from src.handlers.search_handler import SearchHandler
+from src.utils.json_utils import extract_json
 
 # Configure logging
 logging.basicConfig(

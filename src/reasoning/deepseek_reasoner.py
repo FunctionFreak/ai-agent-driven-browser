@@ -55,7 +55,8 @@ class DeepSeekReasoner:
 3. ELEMENT INTERACTION:
    - For cookie banners, PREFER to click "Reject" or "Reject all" buttons when available
    - Only use "Accept all" as a fallback when rejection is not possible
-   - For Google search, specifically use the selector "input[name='q']" for the search box
+   - For Amazon, use selector "input[id='twotabsearchtextbox']" for the search box
+   - For Google search, use selector "textarea[name='q']" instead of "input[name='q']"
    - For navigation, find and click on the most relevant links
    - For forms, fill in required fields and submit
 
@@ -65,12 +66,10 @@ class DeepSeekReasoner:
    - Signal when the task is complete
 
 # OUTPUT FORMAT:
-Always respond with a valid JSON object containing:
+ALWAYS respond with a valid JSON object in the following format - this is critically important:
 {
   "analysis": "Detailed description of what you observe on the screen",
   "state": "Current progress toward the goal",
-  "challenges": "Any obstacles or difficulties encountered",
-  "next_steps": "Future steps after the current action",
   "commands": [
     {"action": "navigate", "url": "https://example.com"},
     {"action": "click", "text": "Accept all"},
@@ -80,10 +79,7 @@ Always respond with a valid JSON object containing:
   "complete": false
 }
 
-When on Google:
-- For search, always use selector "input[name='q']" specifically
-- For accepting cookies, try to use the text "Accept all"
-- If you're stuck, try a direct search without worrying about cookies
+Make sure your response contains ONLY this JSON object with no additional text, markdown, or explanation before or after.
 
 Make decisions based on the OCR text you can see on the page. Focus on moving towards the goal step by step.
 """
