@@ -16,6 +16,7 @@ from src.utils.dom_utils import DOMExplorer
 from src.tasks.task_manager import Task, Subtask
 from src.automation.playwright_controller import execute_dom_action
 from src.prompts.system_prompt import get_system_prompt
+from src.utils.command_preprocessor import preprocess_command
 
 def create_task_from_goal(goal: str) -> Task:
     """
@@ -38,7 +39,6 @@ def create_task_from_goal(goal: str) -> Task:
         task.add_subtask(Subtask("Navigate to chosen site"))
         task.add_subtask(Subtask("Locate desired pizza recipe"))
         task.add_subtask(Subtask("Review ingredients and instructions"))
-
     else:
         # Generic fallback if goal isn't recognized
         task.add_subtask(Subtask("Analyze the goal and decide on a search strategy"))
@@ -51,7 +51,6 @@ def is_captcha_page(ocr_results):
     """Check if current page is showing a CAPTCHA or security challenge"""
     captcha_texts = ["robot", "captcha", "unusual traffic", "verify", "security check"]
     page_text = " ".join([r['text'].lower() for r in ocr_results])
-    
     return any(captcha_text in page_text for captcha_text in captcha_texts)
 
 def attempt_direct_recipe_search(page, context):
@@ -62,7 +61,6 @@ def attempt_direct_recipe_search(page, context):
         {"url": "https://www.epicurious.com/search/pizza", "selector": ".recipe-card"},
         {"url": "https://www.foodnetwork.com/search/pizza-", "selector": ".o-ResultCard"}
     ]
-    
     # Use the site based on attempt count
     site_index = min(context.get("captcha_count", 0), len(sites) - 1)
     site = sites[site_index]
@@ -73,11 +71,9 @@ def attempt_direct_recipe_search(page, context):
     # Wait for results to load
     try:
         page.wait_for_selector(site["selector"], timeout=5000)
-        
         # Click the first recipe result
         page.click(f"{site['selector']}:first-child")
         context["actions_taken"].append(f"Found recipe on {site['url'].split('/')[2]}")
-        
         return True
     except:
         return False
@@ -87,8 +83,8 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
     Enhanced feedback loop with progress tracking and human-like behavior
     """
     # Initialize handlers
-    search_handler = SearchHandler()  # 
-    dom_explorer = DOMExplorer()  
+    search_handler = SearchHandler()
+    dom_explorer = DOMExplorer()
     # Apply stealth mode to the page
     apply_stealth_mode(page)
     
@@ -117,6 +113,10 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
     
     task = create_task_from_goal(initial_goal)
     context["task"] = task
+
+    # Preprocess the high-level user command to generate a clear starting JSON command.
+    preprocessed_command = preprocess_command(initial_goal)
+    logging.info("Preprocessed command: %s", preprocessed_command)
     
     for iteration in range(1, max_iterations + 1):
         context["iteration"] = iteration
@@ -151,7 +151,7 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
             print("Analyzing page DOM structure...")
             interactive_elements = DOMExplorer.find_interactive_elements(page)
             print(f"Found {interactive_elements.get('buttons', 0)} buttons, {interactive_elements.get('links', 0)} links, {interactive_elements.get('inputs', 0)} input fields")
-
+        
         # ---- Subtask Auto-Check Start ----
         current_subtask = context["task"].get_current_subtask()
         if current_subtask:
@@ -166,19 +166,19 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                     break
         # ---- Subtask Auto-Check End ----
 
-            # Check if there's a cookie consent banner using DOM
-            cookie_banner_handled = DOMExplorer.find_cookie_consent(page)
-            if cookie_banner_handled:
-                context["actions_taken"].append("Handled cookie consent banner using DOM exploration")
-                print("Cookie banner handled successfully via DOM")
-                # Optionally, take a new screenshot and continue to next iteration if needed
-                screenshot_path = capture_screenshot(page)
-                continue
+        # Check if there's a cookie consent banner using DOM
+        cookie_banner_handled = DOMExplorer.find_cookie_consent(page)
+        if cookie_banner_handled:
+            context["actions_taken"].append("Handled cookie consent banner using DOM exploration")
+            print("Cookie banner handled successfully via DOM")
+            # Optionally, take a new screenshot and continue to next iteration if needed
+            screenshot_path = capture_screenshot(page)
+            continue
+        
         # Always analyze the page DOM for context
         interactive_elements = DOMExplorer.find_interactive_elements(page)
         print(f"DOM context: {interactive_elements}")
 
-        
         # Generate metadata
         metadata = metadata_gen.generate_metadata(object_detections, ocr_results)
         metadata_file = f"metadata_{iteration}.json"
@@ -207,10 +207,8 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
         if is_captcha_page(ocr_results):
             context["captcha_count"] += 1
             print(f"CAPTCHA detected! Count: {context['captcha_count']}")
-            
             if context["captcha_count"] >= 2:
                 print("Multiple CAPTCHAs encountered. Trying direct recipe site...")
-                
                 # Use specialized strategy based on the goal
                 if "recipe" in initial_goal.lower() or "food" in initial_goal.lower():
                     # List of good recipe sites to try directly
@@ -219,32 +217,23 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                         "https://www.simplyrecipes.com/recipes/homemade_pizza/",
                         "https://www.bbcgoodfood.com/recipes/collection/pizza-recipes"
                     ]
-                    
                     site_index = min(context["captcha_count"] - 2, len(recipe_sites) - 1)
                     recipe_site = recipe_sites[site_index]
-                    
                     print(f"Navigating directly to: {recipe_site}")
                     page.goto(recipe_site)
                     context["actions_taken"].append(f"Navigated to {recipe_site} after CAPTCHA detection")
                 else:
-                    # For non-recipe goals, try a different approach
                     print("Trying alternative approach due to CAPTCHA...")
-                    # Reset the page
                     page.goto("about:blank")
                     context["actions_taken"].append("Reset page due to CAPTCHA")
-                
-                # Add longer delay to appear more human-like
                 wait_time = random.uniform(1.0, 3.0)
                 print(f"Waiting {wait_time:.1f} seconds...")
                 time.sleep(wait_time)
-                
-                # Skip to next iteration
                 continue
         
         # If we're on Google and see a cookie notice, handle it directly
         if "google.com" in current_url and any("cookie" in r['text'].lower() for r in ocr_results):
             try:
-                # Try direct JavaScript approach to accept cookies
                 print("Detected Google cookie notice, attempting direct handling...")
                 clicked = page.evaluate('''() => {
                     const buttons = Array.from(document.querySelectorAll('button'));
@@ -260,16 +249,11 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                     }
                     return false;
                 }''')
-                
                 if clicked:
                     print("Successfully clicked accept button via JavaScript")
                     context["actions_taken"].append("Accepted cookies on Google")
-                    page.wait_for_timeout(2000)  # Wait for the banner to disappear
-                    
-                    # Add a human-like pause
+                    page.wait_for_timeout(2000)
                     time.sleep(random.uniform(1.0, 3.0))
-                    
-                    # Skip to next iteration to check if it worked
                     continue
             except:
                 pass
@@ -277,59 +261,40 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
         # If we're on Google and already passed cookie notice, try direct search
         if "google.com" in current_url and not any("cookie" in r['text'].lower() for r in ocr_results):
             try:
-                # Try multiple selectors for Google's search box
                 search_selectors = [
-                    "textarea[name='q']",  # Google now often uses textarea instead of input
+                    "textarea[name='q']",
                     "input[name='q']",
                     "[aria-label='Search']",
-                    ".gLFyf"  # Google's search class
+                    ".gLFyf"
                 ]
-                
                 for search_selector in search_selectors:
                     try:
                         if page.is_visible(search_selector, timeout=1000):
-                            # If we're here for the first time, search for the goal
                             if iteration <= 2 and not any(a.startswith("Typed") for a in context["actions_taken"]):
-                                # Determine search query based on the goal
                                 if "recipe" in initial_goal.lower():
                                     search_query = "best pizza recipe"
                                 elif "iphone" in initial_goal.lower():
                                     search_query = "iphone 16 pro buy"
                                 else:
                                     search_query = initial_goal
-                                
-                                # Human-like interaction with search
-                                # First, move mouse to the search box
                                 element_position = page.evaluate(f"""() => {{
                                     const element = document.querySelector('{search_selector}');
                                     if (!element) return null;
                                     const rect = element.getBoundingClientRect();
                                     return {{ x: rect.x + rect.width/2, y: rect.y + rect.height/2 }};
                                 }}""")
-                                
                                 if element_position:
-                                    # Move mouse naturally to search box
                                     from src.automation.action_executor import move_mouse_naturally
                                     move_mouse_naturally(page, element_position['x'], element_position['y'])
-                                
-                                # Click and clear the search box
                                 page.click(search_selector)
                                 page.fill(search_selector, "")
-                                
-                                # Type with human-like delays
                                 for char in search_query:
                                     page.type(search_selector, char, delay=random.randint(50, 200))
                                     time.sleep(random.uniform(0.01, 0.05))
-                                
-                                # Pause briefly before pressing enter
                                 time.sleep(random.uniform(0.5, 1.5))
                                 page.press(search_selector, "Enter")
-                                
                                 print(f"Performed direct search with selector: {search_selector}")
-                                # Wait for results page to load
                                 page.wait_for_timeout(3000)
-                                
-                                # Record actions
                                 context["actions_taken"].append(f"Typed '{search_query}' into search box")
                                 context["actions_taken"].append("Pressed Enter to search")
                                 break
@@ -337,14 +302,13 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                         continue
             except Exception as e:
                 print(f"Direct search attempt failed: {e}")
-            
+        
         # Get AI decision with context
         try:
             ai_response = reasoner.get_response(context_message, metadata, dom_data=interactive_elements)
             print("AI Response:", ai_response)
         except Exception as e:
             print(f"AI API error: {e}")
-            # Create a fallback response when API fails
             if "google.com" in current_url:
                 print("Using fallback: Direct search for goal")
                 search_term = "best pizza recipe" if "recipe" in initial_goal.lower() else initial_goal
@@ -359,7 +323,6 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                 }}
                 """
             elif "allrecipes.com" in current_url or "recipe" in current_url:
-                # If we're already on a recipe site, mark task as complete
                 ai_response = """
                 {
                   "analysis": "Found recipe page successfully.",
@@ -371,7 +334,6 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                 }
                 """
             else:
-                # Generic fallback for other pages
                 ai_response = """
                 {
                   "analysis": "Fallback after API error.",
@@ -388,7 +350,6 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
             response_json = extract_json(ai_response)
             if not response_json:
                 logging.error("Failed to extract valid JSON from AI response.")
-                # Create fallback response
                 response_json = {
                     "analysis": "Failed to parse valid JSON from AI response",
                     "state": "Error recovery - restarting from search",
@@ -397,15 +358,10 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                     ],
                     "complete": False
                 }
-            
             if "commands" in response_json:
                 commands = response_json.get("commands", [])
-                
-                # 1) Handle specialized search-related commands first
                 for cmd in commands:
-                    # Example: if it's an input action containing a search term
                     if cmd.get("action") == "input" and cmd.get("text"):
-                        # If the text or selector indicates a search command
                         if "search" in cmd.get("text", "").lower() or "q" in cmd.get("selector", "").lower():
                             print(f"Detected search command, using flexible search handler")
                             search_term = cmd.get("text", "")
@@ -413,11 +369,7 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                             if search_success:
                                 context["actions_taken"].append(f"Searched for '{search_term}' using flexible search handler")
                                 print(f"Successfully searched for: {search_term}")
-                                # Since we've handled this search command, we can continue
-                                # to the next command in the list (no DOM fallback needed here)
                                 continue
-
-                # 2) Attempt DOM-based action execution for click/input/navigate
                 dom_executed = False
                 for cmd in commands:
                     if cmd.get("action") in ["click", "input", "navigate"]:
@@ -427,16 +379,12 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                             dom_executed = True
                         else:
                             logging.error("DOM-based action execution failed for command: %s", cmd)
-
-                # If no DOM-based action succeeded, log a warning
                 if not dom_executed:
                     logging.warning("No DOM-based actions succeeded. Falling back to standard action execution.")
-
                 try:
                     actions = execute_actions(page, ai_response)
                 except Exception as fallback_error:
                     logging.error("Fallback action execution failed: %s", fallback_error)
-                    # Optionally, trigger a self-reasoning fallback or reset the page
                     try:
                         self_prompt = f"""
                         I'm stuck while executing actions for the goal: {initial_goal}
@@ -448,38 +396,25 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                         actions = execute_actions(page, alternative_response)
                     except Exception as e:
                         logging.critical("Self-reasoning fallback also failed: %s", e)
-                        actions = []  # Proceed with no action or consider resetting the context
-
-                # 3) Fallback: call your existing action executor
+                        actions = []
                 actions = execute_actions(page, ai_response)
-            
-            # Check if we're stuck in a loop
             if actions == context["previous_actions"]:
                 context["stuck_counter"] += 1
             else:
                 context["stuck_counter"] = 0
-                
-            # If we're stuck for 3 iterations, try a different approach
             if context["stuck_counter"] >= 3:
                 print("Detected loop, trying alternative approach...")
-                
-                # Generate a self-prompt to analyze the situation
                 self_prompt = f"""
                 I'm stuck in a loop trying to accomplish: {initial_goal}
                 Current page: {current_url}
                 Current state: {context['current_state']}
                 Last actions taken: {', '.join(context['actions_taken'][-3:])}
                 OCR detected text: {', '.join([r['text'] for r in ocr_results[:10]])}
-                
                 What's probably going wrong and what alternative approach should I try?
                 """
-                
                 try:
-                    # Ask the AI for an alternative approach
                     alternative_response = reasoner.get_response(self_prompt, metadata)
                     print("AI Response:", alternative_response)
-                    
-                    # Extract the alternative approach from the response
                     alternative_json = extract_json(alternative_response)
                     if alternative_json and "commands" in alternative_json:
                         print("Trying alternative approach from self-reasoning")
@@ -490,34 +425,26 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                             continue
                 except Exception as e:
                     print(f"Self-reasoning attempt failed: {e}")
-                
-                # If we're stuck on Google with a cookie banner
                 if "google.com" in current_url:
-                    # Try direct search without handling cookies
                     try:
-                        # Try multiple selectors for Google's search box
                         search_selectors = [
-                            "textarea[name='q']",  # Google now often uses textarea instead of input
+                            "textarea[name='q']",
                             "input[name='q']",
                             "[aria-label='Search']",
-                            ".gLFyf"  # Google's search class
+                            ".gLFyf"
                         ]
-                        
                         for search_selector in search_selectors:
                             try:
                                 if page.is_visible(search_selector, timeout=1000):
-                                    # Determine search query based on goal
                                     if "recipe" in initial_goal.lower():
                                         search_query = "best pizza recipe"
                                     else:
                                         search_query = initial_goal
-                                        
-                                    # Human-like typing
                                     page.click(search_selector)
                                     page.fill(search_selector, "")
                                     for char in search_query:
                                         page.type(search_selector, char, delay=random.randint(50, 150))
-                                    
+                                        time.sleep(random.uniform(0.01, 0.05))
                                     time.sleep(random.uniform(0.5, 1.0))
                                     page.press(search_selector, "Enter")
                                     print(f"Attempted direct search for '{search_query}' with selector {search_selector}")
@@ -526,16 +453,13 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                                     break
                             except Exception as e:
                                 continue
-                        
-                        if context["stuck_counter"] > 0:  # If all selectors failed
-                            # If Google is persistently problematic, try going to a recipe site directly
+                        if context["stuck_counter"] > 0:
                             if "recipe" in initial_goal.lower():
                                 print("Bypassing Google search and going directly to recipe site")
                                 direct_success = attempt_direct_recipe_search(page, context)
                                 if direct_success:
                                     context["stuck_counter"] = 0
                             else:
-                                # If that fails, reload the page and try again
                                 page.reload()
                                 print("Reloaded the page to try again")
                                 context["stuck_counter"] = 0
@@ -544,8 +468,6 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                         page.reload()
                         print("Reloaded the page to try again")
                         context["stuck_counter"] = 0
-                
-                # If we're stuck on a CAPTCHA page too many times
                 if context["captcha_count"] > 3:
                     print("Stuck on CAPTCHA too many times, attempting direct navigation to content")
                     if "recipe" in initial_goal.lower():
@@ -556,76 +478,54 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                         page.goto("https://www.apple.com/iphone/")
                         context["actions_taken"].append("Navigated directly to Apple iPhone page due to persistent CAPTCHA")
                         context["stuck_counter"] = 0
-                
-            # Store the current actions for next comparison
             context["previous_actions"] = actions
-            
             if actions:
                 context["actions_taken"].extend(actions)
                 print(f"Actions performed: {', '.join(actions)}")
-            
             current_subtask = context["task"].get_current_subtask()
             if current_subtask:
                 if response_json and "state" in response_json and "done" in response_json["state"].lower():
                     context["task"].mark_subtask_complete()
                     print(f"Marked subtask '{current_subtask.description}' as complete.")
-
                     new_subtask = context["task"].get_current_subtask()
                     if new_subtask:
                         print(f"Next subtask: {new_subtask.description}")
                     else:
                         print("No further subtasks left.")
-
             if context["task"].is_complete():
                 print("\n=== ALL SUBTASKS COMPLETED! ===")
                 break
-            
-            # Check if task is complete
             response_json = extract_json(ai_response)
             if response_json and "complete" in response_json and response_json["complete"] == True:
                 print("\n=== TASK COMPLETED! ===")
                 print(f"Final state: {response_json.get('state', 'Task successful')}")
                 print(f"Analysis: {response_json.get('analysis', 'Goal accomplished')}")
                 break
-                
-            # Update context state if available
             if response_json and "state" in response_json:
                 context["current_state"] = response_json["state"]
         except Exception as e:
             print(f"Error processing AI response: {e}")
-        
-        # Wait before next iteration with variable interval
         actual_interval = random.uniform(max(1, interval-1), interval+2)
         print(f"Waiting {actual_interval:.1f} seconds before next iteration...")
         time.sleep(actual_interval)
-    
-    # Final summary
     print("\n=== Task Summary ===")
     print(f"Original goal: {initial_goal}")
     print(f"Final state: {context['current_state']}")
     print("Actions taken:")
     for i, action in enumerate(context["actions_taken"]):
         print(f"  {i+1}. {action}")
-    
     return context
 
 def extract_search_term_from_goal(goal):
     """Extract likely search term from user goal"""
-    # Common patterns for products
     import re
-    
-    # Try to find product names like "iPhone 16 Pro"
     product_match = re.search(r'(?:find|search for|looking for|buy|purchase|get)?\s*([a-zA-Z0-9]+(?: [a-zA-Z0-9]+){1,5})\b', goal)
     if product_match:
         return product_match.group(1)
-    
-    # Try to find recipe names
     if "recipe" in goal.lower():
         recipe_match = re.search(r'([a-zA-Z]+(?: [a-zA-Z]+){0,3})\s+recipe', goal)
         if recipe_match:
             return f"{recipe_match.group(1)} recipe"
-    
-    # Default to the whole goal if nothing specific found
     return goal
 
 # Example usage if run directly
@@ -633,16 +533,12 @@ if __name__ == "__main__":
     from playwright.sync_api import sync_playwright
     from dotenv import load_dotenv
     import os
-
     load_dotenv()
-    
     user_goal = input("What would you like the browser agent to do? ")
-    
     with sync_playwright() as p:
         from src.automation.playwright_controller import launch_browser_with_profile
         browser_context, temp_profile_path = launch_browser_with_profile()
         page = browser_context.new_page()
-        
         try:
             feedback_loop(page, user_goal)
         except KeyboardInterrupt:
@@ -650,7 +546,6 @@ if __name__ == "__main__":
         finally:
             input("Press Enter to close the browser...")
             browser_context.close()
-            # Clean up temporary profile if needed
             if temp_profile_path:
                 import shutil
                 shutil.rmtree(temp_profile_path, ignore_errors=True)

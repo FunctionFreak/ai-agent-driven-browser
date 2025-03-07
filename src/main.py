@@ -16,7 +16,7 @@ logging.basicConfig(
 )
 
 # Project imports
-from src.automation.playwright_controller import launch_browser_with_profile
+from src.automation.playwright_controller import PlaywrightController
 from src.feedback.feedback_loop import feedback_loop
 
 def main():
@@ -51,9 +51,10 @@ def main():
         # Random delay between messages
         time.sleep(random.uniform(0.3, 1.0))
     
-    # Launch browser with persistent profile
+    # Launch browser with persistent profile using the controller instance
     try:
-        browser_context, temp_profile_path = launch_browser_with_profile()
+        controller = PlaywrightController()
+        browser_context, temp_profile_path = controller.launch_browser_with_profile()
         page = browser_context.new_page()
         
         try:
@@ -70,7 +71,7 @@ def main():
             
             # Only clean up temporary profile if one was created
             if temp_profile_path:
-                print(f"Cleaning up temporary Chrome profile...")
+                print("Cleaning up temporary Chrome profile...")
                 shutil.rmtree(temp_profile_path, ignore_errors=True)
     except Exception as e:
         logging.error(f"Failed to launch browser: {e}")
