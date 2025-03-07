@@ -6,6 +6,7 @@ import tempfile
 import time
 from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
+import logging
 
 # Load environment variables from .env file
 load_dotenv()
@@ -108,6 +109,29 @@ def launch_browser_with_profile():
     except Exception as e:
         print(f"Error launching browser: {e}")
         raise e
+
+def _is_url_allowed(self, url: str, allowed_domains: list | None = None) -> bool:
+    """Check if a URL is allowed based on the allowlist configuration."""
+    if not allowed_domains:
+        return True
+
+    try:
+        from urllib.parse import urlparse
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc.lower()
+
+        # Remove port number if present
+        if ':' in domain:
+            domain = domain.split(':')[0]
+
+        # Check if domain matches any allowed domain pattern
+        return any(
+            domain == allowed_domain.lower() or domain.endswith('.' + allowed_domain.lower())
+            for allowed_domain in allowed_domains
+        )
+    except Exception as e:
+        logging.error(f'Error checking URL allowlist: {str(e)}')
+        return False
 
 def execute_dom_action(page, command):
     """
