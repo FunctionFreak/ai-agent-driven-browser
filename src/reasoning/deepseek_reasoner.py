@@ -1,8 +1,10 @@
 import os
+import json
 import requests
 from dotenv import load_dotenv
 from groq import Groq  # Ensure groq is installed
 from src.feedback.chat_logger import ChatLogger
+from src.prompts.system_prompt import get_system_prompt
 
 # Load environment variables from .env
 load_dotenv()
@@ -88,93 +90,27 @@ class DeepSeekReasoner:
         
         # Craft a detailed system prompt that helps the model understand its task
         # Update the system prompt to include DOM-based instructions and task decomposition
-        system_prompt = f"""You are an autonomous browser agent that can see and interact with web pages. Your goal is to accomplish the user's task by breaking it down into small, human-like actions and carefully reasoning about the current state.
+        system_prompt = get_system_prompt()
 
-CURRENT CONTEXT:
-- DOM Analysis: {dom_info}
-- Vision Summary: {ocr_summary}
-- Number of Objects Detected: {num_objects}
-
-WORKFLOW:
-1. ANALYZE THE CURRENT STATE:
-   - Examine the current webpage using DOM data as the primary source, with vision-based OCR as confirmation.
-   - Identify interactive elements (buttons, links, inputs, dropdowns) and detect interfering elements (cookie banners, popups).
-
-2. TASK DECOMPOSITION:
-   - Break down the overall task into clear, sequential steps.
-   - For example, if the goal is to purchase an "iPhone 16 Pro", follow these stages:
-       a. Define Product Specifications:
-          - Confirm model, storage capacity, color, and other desired features.
-       b. Identify Authorized Sellers:
-          - List trusted platforms such as Apple.com, Amazon, Best Buy, carrier stores, etc.
-       c. Compare Platforms:
-          - Evaluate price, availability, policies, and reputation.
-       d. Select Optimal Seller:
-          - Choose the seller with the best balance of reliability, price, and support.
-       e. Navigate to the Platform:
-          - Access the official website or app to avoid phishing.
-       f. Locate Product Efficiently:
-          - Use the site’s search function with relevant keywords and apply necessary filters.
-       g. Validate Product Details:
-          - Cross-check the product’s SKU or model number against official specifications.
-       h. Check Availability & Logistics:
-          - Verify stock status and review shipping or pickup options.
-       i. Add to Cart:
-          - Add the product to the cart without proceeding to checkout.
-   - Focus on one action at a time, as a human would.
-
-3. INTERACTION PRIORITIES:
-   - Always use DOM-based selectors for precise interactions.
-   - Refer to vision-based data only when DOM information is ambiguous.
-   - Handle cookie banners and popups appropriately (e.g., by rejecting them if possible).
-
-4. PROGRESS TRACKING:
-   - Continuously track which steps have been completed.
-   - If you get stuck, backtrack and try alternative approaches.
-   - Clearly signal when the overall task is complete.
-
-OUTPUT REQUIREMENTS:
-ALWAYS respond with ONLY a valid, properly formatted JSON object using this exact structure:
-
-{{
-  "analysis": "Detailed description of what you observe on the screen",
-  "state": "Current progress toward the goal",
-  "commands": [
-    {{"action": "navigate", "url": "https://example.com"}}
-  ],
-  "complete": false
-}}
-
-COMMAND OPTIONS:
-1. Navigate: {{"action": "navigate", "url": "https://example.com"}}
-2. Click: {{"action": "click", "selector": "#element-id"}} or {{"action": "click", "text": "Button text"}}
-3. Input: {{"action": "input", "selector": "#input-id", "text": "text to type", "submit": true/false}}
-4. Scroll: {{"action": "scroll", "direction": "down", "amount": 300}}
-5. Wait: {{"action": "wait", "time": 2}}
-
-IMPORTANT: 
-- Return ONLY the JSON with no additional text, markdown, code blocks, or explanations
-- Make sure all JSON keys and string values are in double quotes
-- Ensure commas are correctly placed between JSON properties and array items
-- DO NOT include trailing commas at the end of arrays or objects
-- Always include the "analysis", "state", "commands", and "complete" fields
-- Only include exactly ONE command in the "commands" array
-- Keep command simple and focused on a single action
-
-Focus on making progress toward the goal through small, sequential human-like steps.
-"""
-
-        # Construct a detailed prompt with context and visuals
+        # Create the prompt with context and metadata
         prompt_message = f"""
-    CURRENT GOAL AND STATE:
+    CURRENT CONTEXT:
     {user_message}
 
     VISUAL INFORMATION:
-    - OCR detected text: {ocr_summary}
-    - Number of UI elements detected: {num_objects}
-
-    Based on what you can see and where you are, what's the next best action to take to achieve the goal?
+    {json.dumps(metadata, indent=2)}
     """
+        
+        # Call the DeepSeek API with the system prompt
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt_message}
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
 
         # Call the DeepSeek API
         payload = {

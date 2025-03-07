@@ -5,7 +5,7 @@ import random
 import time
 from src.vision.ocr_processor import OCRProcessor
 from src.capture.screen_capture import capture_screenshot
-from src.utils.json_utils import extract_json
+from src.utils.json_parser import extract_json
 
 def simulate_human_mouse_movement(page):
     """Simulate random mouse movements like a human would make"""

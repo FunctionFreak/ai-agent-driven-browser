@@ -13,10 +13,9 @@ from src.utils.json_utils import extract_json
 from src.automation.playwright_controller import apply_stealth_mode
 from src.handlers.search_handler import SearchHandler
 from src.utils.dom_utils import DOMExplorer
-from src.automation.playwright_controller import execute_dom_action
 from src.tasks.task_manager import Task, Subtask
 from src.automation.playwright_controller import execute_dom_action
-from src.automation.playwright_controller import execute_dom_action
+from src.prompts.system_prompt import get_system_prompt
 
 def create_task_from_goal(goal: str) -> Task:
     """
@@ -384,10 +383,22 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                 }
                 """
         
-        # Execute actions        
+        # Execute actions                      
         try:
             response_json = extract_json(ai_response)
-            if response_json and "commands" in response_json:
+            if not response_json:
+                logging.error("Failed to extract valid JSON from AI response.")
+                # Create fallback response
+                response_json = {
+                    "analysis": "Failed to parse valid JSON from AI response",
+                    "state": "Error recovery - restarting from search",
+                    "commands": [
+                        {"action": "navigate", "url": "https://www.google.com"}
+                    ],
+                    "complete": False
+                }
+            
+            if "commands" in response_json:
                 commands = response_json.get("commands", [])
                 
                 # 1) Handle specialized search-related commands first
@@ -466,7 +477,7 @@ def feedback_loop(page, initial_goal: str, max_iterations=20, interval: int = 3)
                 try:
                     # Ask the AI for an alternative approach
                     alternative_response = reasoner.get_response(self_prompt, metadata)
-                    print("Self-reasoning response:", alternative_response)
+                    print("AI Response:", alternative_response)
                     
                     # Extract the alternative approach from the response
                     alternative_json = extract_json(alternative_response)
