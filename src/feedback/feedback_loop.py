@@ -17,6 +17,7 @@ from src.tasks.task_manager import Task, Subtask
 from src.automation.playwright_controller import execute_dom_action
 from src.prompts.system_prompt import get_system_prompt
 from src.utils.command_preprocessor import preprocess_command
+from src.dom.dom_explorer import DOMExplorer
 
 def create_task_from_goal(goal: str) -> Task:
     """
