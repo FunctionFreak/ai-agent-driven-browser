@@ -77,6 +77,12 @@ def try_parse_direct(text):
 
 def try_parse_with_fixes(text):
     """Try to fix common JSON syntax errors before parsing"""
+    try:
+        # Remove any markdown code block indicators
+        text = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', '', text)
+    except re.error:
+        pass
+
     # Find anything that looks like a JSON object
     json_match = re.search(r'({[\s\S]*?})(?:\s*$|\n)', text)
     if not json_match:

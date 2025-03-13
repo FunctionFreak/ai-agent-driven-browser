@@ -1,8 +1,19 @@
-jsonschema
-easyocr
-ultralytics
-playwright
-groq
-requests
-python-dotenv
-opencv-python
+# Core dependencies
+playwright>=1.35.0
+groq>=0.4.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+pydantic>=2.0.0
+
+# Vision-related dependencies
+pillow>=9.5.0
+numpy>=1.24.0
+ultralytics>=8.0.0  # YOLOv8
+easyocr>=1.7.0
+
+# DOM processing
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Utilities
+langchain-core>=0.0.10
